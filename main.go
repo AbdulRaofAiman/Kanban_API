@@ -5,44 +5,44 @@ import (
 	"os"
 
 	"kanban-backend/config"
+	"kanban-backend/handlers"
+	"kanban-backend/repositories"
+	"kanban-backend/routes"
+	"kanban-backend/services"
 	"kanban-backend/utils"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	// Load .env
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error loading .env file")
 	}
 
-	// Connect database
 	config.ConnectDB()
 	config.ConnectS3()
 
-	// Create Fiber app
+	userRepo := repositories.NewUserRepository()
+	boardRepo := repositories.NewBoardRepository()
+	columnRepo := repositories.NewColumnRepository()
+	taskRepo := repositories.NewTaskRepository()
+
+	authService := services.NewAuthService(userRepo)
+	boardService := services.NewBoardService(boardRepo, columnRepo)
+	taskService := services.NewTaskService(taskRepo, columnRepo)
+
+	authController := handlers.NewAuthController(authService)
+	boardController := handlers.NewBoardController(boardService)
+	taskController := handlers.NewTaskController(taskService)
+
 	app := fiber.New(fiber.Config{
-		AppName: "Kanban API v1.0",
+		AppName:      "Kanban API v1.0",
+		ErrorHandler: utils.ErrorHandler,
 	})
 
-	// Middleware
-	app.Use(logger.New())
-	app.Use(cors.New())
+	routes.Setup(app, authService, authController, boardController, taskController)
 
-	app.Use(utils.ErrorHandler)
-
-	// Health check
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"success": true,
-			"message": "Kanban API is running 🚀",
-		})
-	})
-
-	// Start server
 	port := os.Getenv("PORT")
 	log.Printf("🚀 Server running on port %s", port)
 	log.Fatal(app.Listen(":" + port))

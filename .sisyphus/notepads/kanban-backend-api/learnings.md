@@ -2007,3 +2007,183 @@ ok  	kanban-backend/services	0.344s
 - ✅ All tests passing
 - ✅ Integration test covering full workflow
 - ✅ Mock repositories prevent test interference
+
+## Routes and Middleware Implementation (Task: Create Routes with Middleware and Tests)
+
+### What was implemented:
+- Created `routes/routes.go` with complete route setup for API endpoints
+- Created `routes/routes_test.go` with comprehensive integration tests
+- Updated `main.go` to use routes package with dependency injection
+- Implemented middleware chain with CORS, Logger, and Auth middleware
+- Organized routes into groups: /health, /api/v1/auth, /api/v1/boards, /api/v1/tasks
+
+### Route Organization:
+1. **Health Check**: `GET /health` - Public endpoint without authentication
+2. **Auth Routes**: `/api/v1/auth` - Public endpoints
+   - `POST /register` - User registration
+   - `POST /login` - User login
+3. **Board Routes**: `/api/v1/boards` - Protected with Auth middleware
+   - `POST /` - Create board
+   - `GET /:id` - Find board by ID
+   - `GET /` - Find all boards for user
+   - `PUT /:id` - Update board
+   - `DELETE /:id` - Delete board
+4. **Task Routes**: `/api/v1/tasks` - Protected with Auth middleware
+   - `POST /` - Create task
+   - `GET /:id` - Find task by ID
+   - `GET /column/:columnId` - Find tasks by column
+   - `PUT /:id` - Update task
+   - `DELETE /:id` - Delete task
+   - `PUT /:id/move` - Move task to different column
+
+### Middleware Chain Configuration:
+1. **Global Middleware** (applied to all routes):
+   - `middleware.Logger()` - Request logging with unique request ID
+   - `cors.New(middleware.CORSConfig())` - CORS headers configuration
+2. **Route-specific Middleware** (applied to protected routes):
+   - `middleware.AuthMiddleware(authService)` - JWT token validation for /api/v1/boards and /api/v1/tasks
+
+### Dependency Injection Pattern:
+```go
+func Setup(app *fiber.App, authService services.AuthService, authController *handlers.AuthController, boardController *handlers.BoardController, taskController *handlers.TaskController) {
+    // Route configuration
+}
+```
+
+### Mock Services for Testing:
+1. **MockAuthService**: Implements all AuthService interface methods
+   - ValidateToken returns "user-1" for valid mock token
+   - Login returns "mock-jwt-token"
+2. **MockBoardService**: Implements all BoardService interface methods
+   - Create returns board with ID "board-1"
+   - FindByID, FindByUserID return mock board data
+3. **MockTaskService**: Implements all TaskService interface methods
+   - Create returns task with ID "task-1"
+   - FindByID, FindByColumnID return mock task data
+
+### Key findings:
+1. **Middleware order matters**: Logger and CORS must be registered before routes
+2. **Auth middleware injection**: AuthMiddleware requires authService parameter for token validation
+3. **Route group middleware**: Use `group.Use()` to apply middleware to specific route groups
+4. **CORS configuration**: Must use `cors.New(middleware.CORSConfig())` - middleware.CORSConfig() returns cors.Config, not handler
+5. **Test setup function**: Create `setupApp()` to avoid code duplication in tests
+6. **HTTP testing**: Use `httptest.NewRequest()` for Fiber HTTP testing
+7. **Authorization headers**: Format must be `Bearer <token>` for auth middleware
+8. **Mock interface implementation**: All mock services must implement full interface (even if not all methods tested)
+
+### Test coverage:
+1. **TestHealthCheck**: Health endpoint returns 200
+2. **TestAuthRegister**: User registration without auth token
+3. **TestAuthLogin**: User login without auth token
+4. **TestBoardCreate_WithoutToken**: Protected route returns 401 without token
+5. **TestBoardCreate_WithValidToken**: Protected route returns 200 with valid token
+6. **TestBoardFindAll_WithoutToken**: Protected route returns 401 without token
+7. **TestBoardFindAll_WithValidToken**: Protected route returns 200 with valid token
+8. **TestBoardFindByID_WithValidToken**: Board detail with auth
+9. **TestBoardUpdate_WithValidToken**: Board update with auth
+10. **TestBoardDelete_WithValidToken**: Board delete with auth
+11. **TestTaskCreate_WithoutToken**: Protected route returns 401 without token
+12. **TestTaskCreate_WithValidToken**: Protected route returns 200 with valid token
+13. **TestTaskFindByID_WithValidToken**: Task detail with auth
+14. **TestTaskFindByColumnID_WithValidToken**: Tasks by column with auth
+15. **TestTaskUpdate_WithValidToken**: Task update with auth
+16. **TestTaskDelete_WithValidToken**: Task delete with auth
+17. **TestTaskMove_WithValidToken**: Task move with auth
+18. **TestInvalidRoute**: Non-existent route returns 404
+19. **TestInvalidMethod**: Wrong HTTP method returns appropriate error
+
+### Best practices learned:
+- Separate public and protected routes using middleware
+- Use route groups (`app.Group()`) to organize related endpoints
+- Apply auth middleware at group level to avoid repetition
+- Mock services for isolated integration testing
+- Test both authenticated and unauthenticated access
+- Use httptest for HTTP endpoint testing
+- Create setup functions to reduce test duplication
+- Implement full service interfaces in mocks (even for unused methods)
+- Test middleware functionality (401 responses without auth)
+
+### Integration notes:
+- Routes replace inline route definitions in main.go
+- Main.go updated with dependency injection for repositories, services, and controllers
+- AuthMiddleware requires authService for token validation
+- CORS and Logger middleware from middleware package integrated
+- All tests pass: 19 test functions covering all routes and middleware
+- Ready for production deployment with proper JWT_SECRET configuration
+
+### Files created/modified:
+1. **routes/routes.go**: Route configuration with middleware (45 lines)
+2. **routes/routes_test.go**: Comprehensive integration tests (370 lines)
+3. **main.go**: Updated with dependency injection and routes.Setup() call
+
+### Test results:
+```
+=== RUN   TestHealthCheck
+--- PASS: TestHealthCheck (0.00s)
+=== RUN   TestAuthRegister
+--- PASS: TestAuthRegister (0.00s)
+=== RUN   TestAuthLogin
+--- PASS: TestAuthLogin (0.00s)
+=== RUN   TestBoardCreate_WithoutToken
+--- PASS: TestBoardCreate_WithoutToken (0.00s)
+=== RUN   TestBoardCreate_WithValidToken
+--- PASS: TestBoardCreate_WithValidToken (0.00s)
+=== RUN   TestBoardFindAll_WithoutToken
+--- PASS: TestBoardFindAll_WithoutToken (0.00s)
+=== RUN   TestBoardFindAll_WithValidToken
+--- PASS: TestBoardFindAll_WithValidToken (0.00s)
+=== RUN   TestBoardFindByID_WithValidToken
+--- PASS: TestBoardFindByID_WithValidToken (0.00s)
+=== RUN   TestBoardUpdate_WithValidToken
+--- PASS: TestBoardUpdate_WithValidToken (0.00s)
+=== RUN   TestBoardDelete_WithValidToken
+--- PASS: TestBoardDelete_WithValidToken (0.00s)
+=== RUN   TestTaskCreate_WithoutToken
+--- PASS: TestTaskCreate_WithoutToken (0.00s)
+=== RUN   TestTaskCreate_WithValidToken
+--- PASS: TestTaskCreate_WithValidToken (0.00s)
+=== RUN   TestTaskFindByID_WithValidToken
+--- PASS: TestTaskFindByID_WithValidToken (0.00s)
+=== RUN   TestTaskFindByColumnID_WithValidToken
+--- PASS: TestTaskFindByColumnID_WithValidToken (0.00s)
+=== RUN   TestTaskUpdate_WithValidToken
+--- PASS: TestTaskUpdate_WithValidToken (0.00s)
+=== RUN   TestTaskDelete_WithValidToken
+--- PASS: TestTaskDelete_WithValidToken (0.00s)
+=== RUN   TestTaskMove_WithValidToken
+--- PASS: TestTaskMove_WithValidToken (0.00s)
+=== RUN   TestInvalidRoute
+--- PASS: TestInvalidRoute (0.00s)
+=== RUN   TestInvalidMethod
+--- PASS: TestInvalidMethod (0.00s)
+PASS
+ok  	kanban-backend/routes	0.310s
+```
+
+### Verification:
+- ✅ Routes organized into groups (health, auth, boards, tasks)
+- ✅ Public routes without auth middleware (/health, /api/v1/auth)
+- ✅ Protected routes with AuthMiddleware (/api/v1/boards, /api/v1/tasks)
+- ✅ CORS and Logger middleware globally applied
+- ✅ Dependency injection in Setup function
+- ✅ Mock services implementing full interfaces
+- ✅ Comprehensive test coverage (19 test functions)
+- ✅ All tests passing
+- ✅ Integration with existing handlers and middleware
+- ✅ Main.go updated with proper initialization
+
+### Route organization patterns:
+1. **Public routes**: Health check, registration, login - no authentication required
+2. **Protected routes**: Boards and tasks - JWT authentication required
+3. **Route groups**: Organize related endpoints under common prefixes
+4. **Middleware application**: Global middleware at app level, route-specific at group level
+5. **HTTP methods**: RESTful conventions (GET for read, POST for create, PUT for update, DELETE for delete)
+
+### Integration testing strategies:
+1. **Mock services**: Implement full service interfaces for isolated testing
+2. **Test both scenarios**: With and without authentication
+3. **Test all endpoints**: Cover every route with HTTP method verification
+4. **Test error cases**: Invalid routes, wrong methods, missing tokens
+5. **Setup functions**: Create reusable test setup to reduce duplication
+6. **Request headers**: Set proper Authorization header format for auth testing
+
