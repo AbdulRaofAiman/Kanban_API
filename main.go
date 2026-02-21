@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"kanban-backend/config"
-	"kanban-backend/handlers"
+	"kanban-backend/controllers"
 	"kanban-backend/repositories"
 	"kanban-backend/routes"
 	"kanban-backend/services"
@@ -27,21 +27,30 @@ func main() {
 	boardRepo := repositories.NewBoardRepository()
 	columnRepo := repositories.NewColumnRepository()
 	taskRepo := repositories.NewTaskRepository()
+	commentRepo := repositories.NewCommentRepository()
+	labelRepo := repositories.NewLabelRepository()
+	attachmentRepo := repositories.NewAttachmentRepository()
 
 	authService := services.NewAuthService(userRepo)
 	boardService := services.NewBoardService(boardRepo, columnRepo)
 	taskService := services.NewTaskService(taskRepo, columnRepo)
+	commentService := services.NewCommentService(commentRepo, taskRepo)
+	labelService := services.NewLabelService(labelRepo, taskRepo)
+	attachmentService := services.NewAttachmentService(attachmentRepo, taskRepo)
 
-	authController := handlers.NewAuthController(authService)
-	boardController := handlers.NewBoardController(boardService)
-	taskController := handlers.NewTaskController(taskService)
+	authController := controllers.NewAuthController(authService)
+	boardController := controllers.NewBoardController(boardService)
+	taskController := controllers.NewTaskController(taskService)
+	commentController := controllers.NewCommentController(commentService)
+	labelController := controllers.NewLabelController(labelService)
+	attachmentController := controllers.NewAttachmentController(attachmentService)
 
 	app := fiber.New(fiber.Config{
 		AppName:      "Kanban API v1.0",
 		ErrorHandler: utils.ErrorHandler,
 	})
 
-	routes.Setup(app, authService, authController, boardController, taskController)
+	routes.Setup(app, authService, authController, boardController, taskController, commentController, labelController, attachmentController)
 
 	port := os.Getenv("PORT")
 	log.Printf("🚀 Server running on port %s", port)

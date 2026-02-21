@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"kanban-backend/handlers"
+	"kanban-backend/controllers"
 	"kanban-backend/middleware"
 	"kanban-backend/services"
 
@@ -9,7 +9,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
-func Setup(app *fiber.App, authService services.AuthService, authController *handlers.AuthController, boardController *handlers.BoardController, taskController *handlers.TaskController) {
+func Setup(app *fiber.App, authService services.AuthService, authController *controllers.AuthController, boardController *controllers.BoardController, taskController *controllers.TaskController, commentController *controllers.CommentController, labelController *controllers.LabelController, attachmentController *controllers.AttachmentController) {
 	app.Use(middleware.Logger())
 	app.Use(cors.New(middleware.CORSConfig()))
 
@@ -37,4 +37,30 @@ func Setup(app *fiber.App, authService services.AuthService, authController *han
 	tasks.Put("/:id", taskController.Update)
 	tasks.Delete("/:id", taskController.Delete)
 	tasks.Put("/:id/move", taskController.Move)
+	tasks.Post("/:id/labels/:label_id", labelController.AddToTask)
+	tasks.Delete("/:id/labels/:label_id", labelController.RemoveFromTask)
+
+	comments := app.Group("/api/v1/comments")
+	comments.Use(middleware.AuthMiddleware(authService))
+	comments.Post("/", commentController.Create)
+	comments.Get("/:id", commentController.FindByID)
+	comments.Get("/task/:task_id", commentController.FindByTaskID)
+	comments.Put("/:id", commentController.Update)
+	comments.Delete("/:id", commentController.Delete)
+
+	labels := app.Group("/api/v1/labels")
+	labels.Use(middleware.AuthMiddleware(authService))
+	labels.Post("/", labelController.Create)
+	labels.Get("/", labelController.FindAll)
+	labels.Get("/:id", labelController.FindByID)
+	labels.Put("/:id", labelController.Update)
+	labels.Delete("/:id", labelController.Delete)
+
+	attachments := app.Group("/api/v1/attachments")
+	attachments.Use(middleware.AuthMiddleware(authService))
+	attachments.Post("/", attachmentController.Create)
+	attachments.Get("/:id", attachmentController.FindByID)
+	attachments.Get("/task/:task_id", attachmentController.FindByTaskID)
+	attachments.Put("/:id", attachmentController.Update)
+	attachments.Delete("/:id", attachmentController.Delete)
 }

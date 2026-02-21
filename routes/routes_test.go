@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"kanban-backend/handlers"
+	"kanban-backend/controllers"
 	"kanban-backend/models"
 	"kanban-backend/utils"
 
@@ -120,18 +120,144 @@ func (m *MockTaskService) Move(ctx context.Context, taskID, columnID, userID str
 	return utils.NewNotFound("task not found")
 }
 
+type MockCommentService struct{}
+
+func (m *MockCommentService) Create(ctx context.Context, taskID, userID, content string) (*models.Comment, error) {
+	return &models.Comment{ID: "comment-1", TaskID: taskID, UserID: userID, Content: content}, nil
+}
+
+func (m *MockCommentService) FindByID(ctx context.Context, id, userID string) (*models.Comment, error) {
+	if id == "comment-1" {
+		return &models.Comment{ID: id, Content: "Test Comment"}, nil
+	}
+	return nil, utils.NewNotFound("comment not found")
+}
+
+func (m *MockCommentService) FindByTaskID(ctx context.Context, taskID, userID string) ([]*models.Comment, error) {
+	if taskID == "task-1" {
+		return []*models.Comment{
+			{ID: "comment-1", TaskID: taskID, Content: "Test Comment"},
+		}, nil
+	}
+	return nil, utils.NewNotFound("task not found")
+}
+
+func (m *MockCommentService) Update(ctx context.Context, id, userID, content string) (*models.Comment, error) {
+	if id == "comment-1" {
+		return &models.Comment{ID: id, Content: content}, nil
+	}
+	return nil, utils.NewNotFound("comment not found")
+}
+
+func (m *MockCommentService) Delete(ctx context.Context, id, userID string) error {
+	if id == "comment-1" {
+		return nil
+	}
+	return utils.NewNotFound("comment not found")
+}
+
+type MockLabelService struct{}
+
+func (m *MockLabelService) Create(ctx context.Context, name, color string) (*models.Label, error) {
+	return &models.Label{ID: "label-1", Name: name, Color: color}, nil
+}
+
+func (m *MockLabelService) FindByID(ctx context.Context, id string) (*models.Label, error) {
+	if id == "label-1" {
+		return &models.Label{ID: id, Name: "Test Label", Color: "#FF0000"}, nil
+	}
+	return nil, utils.NewNotFound("label not found")
+}
+
+func (m *MockLabelService) FindAll(ctx context.Context) ([]*models.Label, error) {
+	return []*models.Label{
+		{ID: "label-1", Name: "Bug", Color: "#FF0000"},
+		{ID: "label-2", Name: "Feature", Color: "#00FF00"},
+	}, nil
+}
+
+func (m *MockLabelService) Update(ctx context.Context, id, name, color string) (*models.Label, error) {
+	if id == "label-1" {
+		return &models.Label{ID: id, Name: name, Color: color}, nil
+	}
+	return nil, utils.NewNotFound("label not found")
+}
+
+func (m *MockLabelService) Delete(ctx context.Context, id string) error {
+	if id == "label-1" {
+		return nil
+	}
+	return utils.NewNotFound("label not found")
+}
+
+func (m *MockLabelService) AddToTask(ctx context.Context, taskID, labelID, userID string) error {
+	if taskID == "task-1" && labelID == "label-1" {
+		return nil
+	}
+	return utils.NewNotFound("task or label not found")
+}
+
+func (m *MockLabelService) RemoveFromTask(ctx context.Context, taskID, labelID, userID string) error {
+	if taskID == "task-1" && labelID == "label-1" {
+		return nil
+	}
+	return utils.NewNotFound("task or label not found")
+}
+
+type MockAttachmentService struct{}
+
+func (m *MockAttachmentService) Create(ctx context.Context, taskID, userID, fileName, fileURL string, fileSize int64) (*models.Attachment, error) {
+	return &models.Attachment{ID: "attachment-1", TaskID: taskID, FileName: fileName, FileURL: fileURL, FileSize: fileSize}, nil
+}
+
+func (m *MockAttachmentService) FindByID(ctx context.Context, id, userID string) (*models.Attachment, error) {
+	if id == "attachment-1" {
+		return &models.Attachment{ID: id, FileName: "file.pdf", FileURL: "https://example.com/file.pdf"}, nil
+	}
+	return nil, utils.NewNotFound("attachment not found")
+}
+
+func (m *MockAttachmentService) FindByTaskID(ctx context.Context, taskID, userID string) ([]*models.Attachment, error) {
+	if taskID == "task-1" {
+		return []*models.Attachment{
+			{ID: "attachment-1", TaskID: taskID, FileName: "file.pdf", FileURL: "https://example.com/file.pdf"},
+		}, nil
+	}
+	return nil, utils.NewNotFound("task not found")
+}
+
+func (m *MockAttachmentService) Update(ctx context.Context, id, userID, fileName, fileURL string, fileSize int64) (*models.Attachment, error) {
+	if id == "attachment-1" {
+		return &models.Attachment{ID: id, FileName: fileName, FileURL: fileURL, FileSize: fileSize}, nil
+	}
+	return nil, utils.NewNotFound("attachment not found")
+}
+
+func (m *MockAttachmentService) Delete(ctx context.Context, id, userID string) error {
+	if id == "attachment-1" {
+		return nil
+	}
+	return utils.NewNotFound("attachment not found")
+}
+
 func setupApp() *fiber.App {
 	app := fiber.New()
 
 	mockAuthService := &MockAuthService{}
 	mockBoardService := &MockBoardService{}
 	mockTaskService := &MockTaskService{}
+	mockCommentService := &MockCommentService{}
+	mockLabelService := &MockLabelService{}
+	mockAttachmentService := &MockAttachmentService{}
 
-	authController := handlers.NewAuthController(mockAuthService)
-	boardController := handlers.NewBoardController(mockBoardService)
-	taskController := handlers.NewTaskController(mockTaskService)
+	authController := controllers.NewAuthController(mockAuthService)
+	boardController := controllers.NewBoardController(mockBoardService)
+	taskController := controllers.NewTaskController(mockTaskService)
+	commentController := controllers.NewCommentController(mockCommentService)
+	labelController := controllers.NewLabelController(mockLabelService)
+	attachmentController := controllers.NewAttachmentController(mockAttachmentService)
 
-	Setup(app, mockAuthService, authController, boardController, taskController)
+	Setup(app, mockAuthService, authController, boardController, taskController, commentController, labelController, attachmentController)
 
 	return app
 }
