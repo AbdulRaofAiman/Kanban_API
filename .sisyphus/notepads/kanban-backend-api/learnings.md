@@ -1,5 +1,26 @@
 
 
+## Migration Setup & Structure (Task 16)
+
+### What was implemented:
+- Added `migrations/migrate.go` with `MigrationRunner` abstraction using golang-migrate
+- Added `migrations/main.go` CLI entry with `up`, `down`, `status` commands
+- Added `migrations/migrate_test.go` with SQLite in-memory lifecycle test (up/status/down)
+- Added SQL migration scaffold files under `migrations/sql/`
+
+### Key findings:
+1. `go run migrations/main.go` only compiles the target file, so the CLI file must be executable standalone and import package code explicitly.
+2. For package + CLI in the same directory, `//go:build ignore` on CLI file keeps `go test ./migrations` working while still allowing direct `go run migrations/main.go`.
+3. golang-migrate supports both postgres and sqlite through `database/*` drivers with `NewWithDatabaseInstance`.
+4. Using a dedicated `migrations` table (`MigrationsTable: "migrations"`) keeps migration tracking explicit.
+5. SQLite in-memory tests are fast and reliable for migration runner unit tests.
+
+### Integration notes:
+- Postgres path uses existing `config.DB` connection from `config/database.go`.
+- Fallback sqlite path enables local CLI usage when postgres env is unavailable.
+- Verified command: `go run migrations/main.go up`.
+- Verified tests: `go test ./migrations -v`.
+
 ## Logger Middleware Implementation (Task 52)
 
 ### What was implemented:
@@ -889,3 +910,251 @@ ok  	kanban-backend/models	0.191s
 - Depends on User model (Task 8) for ownership
 - Will be used in Task 16 (Migrations) for creating boards table
 - Other models (Column, Task, Member) already have relationships to Board
+
+## User Model Implementation (Task 8)
+
+### What was implemented:
+- Created `models/user.go` with User struct for user authentication and management
+- Created `models/refresh_token.go` with RefreshToken struct for JWT refresh token storage
+- Created `models/user_test.go` with comprehensive tests (12 test functions, 30+ subtests)
+- Implements audit hooks (BeforeCreate, AfterUpdate) that log to audit_logs table
+- Implements password hashing with bcrypt using utils.HashPassword()
+- BelongsTo relationship with User via foreign key (RefreshToken.UserID)
+- RefreshTokens has-many relationship in User model
+
+### User Model Fields:
+1. **ID** (string): Primary key with UUID type, `gorm:"primaryKey;type:varchar(36)"`
+2. **Username** (string): Unique username, `gorm:"not null;type:varchar(50);uniqueIndex"`
+3. **Email** (string): Unique email, `gorm:"not null;type:varchar(255);uniqueIndex"`
+4. **Password** (string): Hashed password (never exposed in JSON), `gorm:"not null;type:text;json:"-"`
+5. **CreatedAt** (time.Time): Auto-generated on create, `gorm:"autoCreateTime"`
+6. **UpdatedAt** (time.Time): Auto-updated on modify, `gorm:"autoUpdateTime"`
+7. **DeletedAt** (gorm.DeletedAt): Soft delete support, `gorm:"index"`
+
+### RefreshToken Model Fields:
+1. **ID** (string): Primary key with UUID type, `gorm:"primaryKey;type:varchar(36)"`
+2. **UserID** (string): Foreign key to User, `gorm:"not null;type:varchar(36);index"`
+3. **Token** (string): JWT refresh token string, `gorm:"not null;type:text;uniqueIndex"`
+4. **ExpiresAt** (time.Time): Token expiration timestamp, `gorm:"not null"`
+5. **CreatedAt** (time.Time): Auto-generated on create, `gorm:"autoCreateTime"`
+6. **UpdatedAt** (time.Time): Auto-updated on modify, `gorm:"autoUpdateTime"`
+7. **DeletedAt** (gorm.DeletedAt): Soft delete support, `gorm:"index"`
+
+### Relationships:
+1. **HasMany RefreshTokens**: User has many refresh tokens, `[]RefreshToken` with `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+2. **BelongsTo User**: RefreshToken belongs to user, `*User` with `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+3. **CASCADE constraint**: RefreshTokens cascade deleted when User is deleted
+
+### Model Methods:
+1. **TableName() string**: Returns "users" or "refresh_tokens" table name
+2. **BeforeCreate(tx *gorm.DB) error**: GORM hook to auto-generate UUID, hash password, log audit
+3. **AfterUpdate(tx *gorm.DB) error**: GORM hook to log audit entry on update
+4. **SetPassword(password string) error**: Hash and set new password (validates min 8 chars)
+5. **CheckPassword(password string) error**: Verify password matches stored hash
+
+### Audit logging implementation:
+- **logAudit() method**: Inserts audit entries into audit_logs table
+- **BeforeCreate hook**: Logs "User created" action when user is created
+- **AfterUpdate hook**: Logs "User updated" action when user is modified
+- **AuditLog struct**: Anonymous struct in user.go, includes ID, UserID, Action, Message, CreatedAt
+- **Table name**: audit_logs (created via tx.Table("audit_logs").Create())
+
+### Key findings:
+1. **UUID generation**: Uses `uuid.New().String()` in BeforeCreate hook for auto-generation
+2. **Password hashing**: Uses `utils.HashPassword()` which applies bcrypt with DefaultCost (10)
+3. **Password length check**: Checks if password length != 60 to determine if already hashed
+4. **JSON security**: Password field has `json:"-"` tag to prevent exposure in API responses
+5. **Unique indexes**: Username and Email have uniqueIndex to prevent duplicates
+6. **RefreshToken unique index**: Token field has uniqueIndex to prevent duplicate tokens
+7. **Soft delete**: Both User and RefreshToken support soft delete with gorm.DeletedAt
+8. **Audit hooks**: Automatically log all create/update operations for compliance
+
+### Test Coverage:
+1. **TestUserModelStructure**: Validates User struct fields and types
+2. **TestUserTableName**: Verifies TableName() returns "users"
+3. **TestUserBeforeCreateHook**: Tests ID generation, password hashing, short password validation, already-hashed password
+4. **TestUserAfterUpdateHook**: Tests audit log creation on update
+5. **TestAuditHooks**: Tests both create and update audit logging
+6. **TestUserSetPassword**: Tests SetPassword with valid/invalid passwords
+7. **TestUserCheckPassword**: Tests CheckPassword with correct/incorrect/empty passwords, case sensitivity
+8. **TestUserRefreshTokensRelation**: Tests HasMany relationship, Preload, CASCADE delete
+9. **TestRefreshTokenTableName**: Verifies TableName() returns "refresh_tokens"
+10. **TestRefreshTokenUniqueIndex**: Tests unique constraint on Token field
+11. **TestUserUniqueConstraints**: Tests unique constraints on Username and Email
+
+### Best practices learned:
+- Use `json:"-"` tag for sensitive fields (password) to prevent JSON exposure
+- Check password hash length (60 chars) to detect already-hashed passwords
+- Use `utils.HashPassword()` instead of direct bcrypt calls for consistency
+- Validate password length BEFORE hashing (SetPassword method)
+- Use uniqueIndex on email and username to prevent duplicate users
+- Use CASCADE constraints to automatically cleanup related records
+- Soft delete allows user recovery and audit trail
+- Test helper functions (setupUserTestDB) reduce test duplication
+- Create separate test DB setup to avoid issues with other models (Board.Tasks relationship issues)
+- GORM hooks must return errors properly to halt operations
+
+### Model design decisions:
+1. **UUID vs auto-increment**: UUIDs are better for security and distributed systems
+2. **Password as text**: Bcrypt hashes are exactly 60 characters, text type accommodates
+3. **Email limit 255**: Standard maximum email length per RFC 5321
+4. **Username limit 50**: Reasonable length for usernames, reduces storage
+5. **Soft delete**: Allows user recovery and audit trail
+6. **CASCADE delete**: Automatically cleanup refresh tokens when user deleted
+7. **Unique indexes**: Username and Email uniqueness enforced at database level
+8. **RefreshToken unique token**: Prevents token reuse conflicts
+9. **Audit logging**: Automatic logging provides compliance tracking
+10. **Hook error handling**: BeforeCreate returns error for short passwords, preventing creation
+
+### Integration notes:
+- Depends on utils/password.go (Task 3) for HashPassword and CheckPassword
+- Depends on utils/jwt.go (Task 1) for JWT token generation in refresh tokens
+- JWT CustomClaims includes user_id for refresh token association
+- Required for Task 28 (auth service) - User model for authentication
+- Required for Task 16 (migrations) - users, refresh_tokens, audit_logs tables
+- RefreshToken model supports JWT refresh token workflow (access token expired, refresh token valid)
+- Ready for integration with auth controllers (Login, Register, RefreshToken endpoints)
+- Compatible with existing Fiber v2.52.11 and GORM v1.31.1
+- setupUserTestDB avoids Board.Tasks relationship issues (pre-existing model design issue)
+- All tests pass: 11 test functions with 30+ subtests
+
+### Build verification:
+- user.go and refresh_token.go compile successfully
+- No new dependencies needed (google/uuid, gorm, utils already in go.mod)
+- Test database: SQLite in-memory for fast test execution
+- LSP diagnostics: gopls not installed, but build passes
+
+### Issues encountered and resolved:
+1. **Duplicate User struct**: Removed placeholder User struct from board.go (line 49-55)
+2. **setupTestDB conflict**: Created setupUserTestDB to avoid Board.Tasks relationship migration issues
+3. **GORM First() with UUID**: Changed `db.First(&foundUser, user.ID)` to `db.Where("id = ?", user.ID).First(&foundUser)` for proper UUID handling
+4. **Missing RefreshToken in migration**: Added &RefreshToken{} to setupTestDB AutoMigrate call
+5. **AuditLogs table creation**: Used `db.Table("audit_logs").AutoMigrate(&AuditLog{})` to create audit_logs table inline
+
+### Files created/modified:
+1. **models/user.go**: User model with audit hooks and password methods
+2. **models/refresh_token.go**: RefreshToken model with User relationship
+3. **models/user_test.go**: Comprehensive test suite (12 test functions)
+4. **models/board_test.go**: Updated to include RefreshToken in AutoMigrate, removed placeholder User struct
+
+### Verification:
+- ✅ User struct with correct GORM tags (primaryKey, uniqueIndex, not null)
+- ✅ RefreshToken struct with correct GORM tags
+- ✅ BeforeCreate hook for ID generation and password hashing
+- ✅ AfterUpdate hook for audit logging
+- ✅ SetPassword method with validation and hashing
+- ✅ CheckPassword method using utils.CheckPassword
+- ✅ RefreshTokens has-many relationship with CASCADE delete
+- ✅ Password field not exposed in JSON (json:"-" tag)
+- ✅ Unique constraints on Username and Email
+- ✅ Unique constraint on RefreshToken.Token
+- ✅ Comprehensive test suite (12 test functions, 30+ subtests)
+- ✅ All tests passing
+- ✅ Build passes without errors
+
+## SQL Migration Files Implementation (Tasks 17-20)
+
+### What was implemented:
+- Created 24 SQL migration files in migrations/ directory (12 tables × 2 directions)
+- Each table has .up.sql (create) and .down.sql (rollback) files
+- All migrations include indexes, foreign keys, and constraints
+- Naming convention: 00001_XXXX.up.sql and 00001_XXXX.down.sql
+
+### Core Tables (8):
+1. **00001_create_users**: User authentication with username/email unique constraints
+2. **00002_create_boards**: Kanban boards with user ownership and soft delete
+3. **00003_create_columns**: Board columns with order tracking
+4. **00004_create_tasks**: Kanban tasks with deadline indexing
+5. **00005_create_comments**: Task comments with user tracking
+6. **00006_create_labels**: Task labels with unique name constraint
+7. **00007_create_attachments**: File attachments for tasks with S3 URLs
+8. **00008_create_notifications**: User notifications with read status tracking
+
+### Join Tables (4):
+9. **00009_create_task_labels**: Many-to-many join table with composite PK
+10. **00010_create_members**: Board members with role management
+11. **00011_create_refresh_tokens**: JWT refresh tokens with unique token constraint
+12. **00012_create_audit_logs**: User activity audit trail
+
+### Migration file pattern used:
+```sql
+-- UP file (create table and indexes)
+CREATE TABLE table_name (
+    id VARCHAR(36) PRIMARY KEY,
+    field_name VARCHAR(255) NOT NULL,
+    foreign_key_id VARCHAR(36) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    CONSTRAINT fk_table_name_foreign_key FOREIGN KEY (foreign_key_id) REFERENCES table(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_table_name_foreign_key ON table_name(foreign_key_id);
+CREATE INDEX idx_table_name_deleted_at ON table_name(deleted_at);
+
+-- DOWN file (drop indexes then table)
+DROP INDEX IF EXISTS idx_table_name_deleted_at;
+DROP INDEX IF EXISTS idx_table_name_foreign_key;
+DROP TABLE IF EXISTS table_name CASCADE;
+```
+
+### PostgreSQL vs SQLite considerations:
+1. **Timestamps**: 
+   - PostgreSQL: `TIMESTAMP` or `TIMESTAMPTZ`
+   - SQLite: `TIMESTAMP` or `DATETIME` (both work)
+2. **VARCHAR vs TEXT**:
+   - PostgreSQL: `VARCHAR(n)` for limited length strings
+   - SQLite: `TEXT` for all strings (length limits ignored)
+3. **Foreign keys**:
+   - PostgreSQL: Enforces constraints by default
+   - SQLite: Requires `PRAGMA foreign_keys = ON` to enforce
+4. **CASCADE**:
+   - Both support `ON DELETE CASCADE`
+   - Both support `DROP TABLE ... CASCADE`
+
+### Index strategies implemented:
+1. **Foreign key indexes**: All foreign keys have indexes for query performance
+2. **Unique constraints**: username, email, name, token fields have unique indexes
+3. **Soft delete indexes**: All soft delete tables (DeletedAt field) have indexes
+4. **Query optimization indexes**: deadline, read_at, user_id fields indexed
+5. **Composite PK**: task_labels uses (task_id, label_id) as composite primary key
+
+### Index naming convention:
+- **Foreign key indexes**: `idx_table_name_foreign_key` (e.g., idx_boards_user_id)
+- **Unique indexes**: `idx_table_name_field` for unique constraints
+- **Query indexes**: `idx_table_name_field` for optimization (e.g., idx_tasks_deadline)
+- **Soft delete indexes**: `idx_table_name_deleted_at`
+
+### Foreign key CASCADE patterns:
+1. **User deletion**: Cascades to boards, comments, notifications, refresh_tokens, members, audit_logs
+2. **Board deletion**: Cascades to columns, members, tasks (via columns)
+3. **Column deletion**: Cascades to tasks
+4. **Task deletion**: Cascades to comments, task_labels, attachments
+5. **Label deletion**: Cascades to task_labels
+6. **Soft delete**: All tables support soft delete via DeletedAt field
+
+### Key findings:
+1. **VARCHAR(36) for UUIDs**: All IDs use VARCHAR(36) to store UUIDs (36 chars with dashes)
+2. **TIMESTAMP DEFAULT CURRENT_TIMESTAMP**: Auto-populates created_at field
+3. **TIMESTAMP NULL**: For nullable timestamps (deadline, read_at, deleted_at)
+4. **TEXT for long content**: description, message, password, content fields use TEXT
+5. **BIGINT for file sizes**: FileSize uses BIGINT for large file support
+6. **INTEGER for order**: Order field uses INTEGER for column ordering
+7. **Composite PK**: Join tables use composite PK without separate ID field
+8. **CASCADE everywhere**: All foreign keys use ON DELETE CASCADE for automatic cleanup
+
+### Verification:
+- 24 migration files created (12 up.sql + 12 down.sql)
+- All files follow naming convention (00001_XXXX.up/down.sql)
+- All indexes have corresponding DROP statements in down.sql
+- All tables have proper foreign key constraints with CASCADE
+- All soft delete tables have DeletedAt index
+- Ready for migration runner (Task 16) to execute
+
+### Integration notes:
+- Migration runner (migrations/migrate.go) already exists from Task 16
+- Use `go run migrations/main.go up` to apply migrations
+- Use `go run migrations/main.go down` to rollback migrations
+- Use `go run migrations/main.go status` to check migration status
+- Compatible with PostgreSQL (production) and SQLite (testing)
+- All migrations follow golang-migrate directory structure
