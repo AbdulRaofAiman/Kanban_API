@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 
 	"kanban-backend/migrations"
 
@@ -57,7 +56,7 @@ func main() {
 }
 
 func defaultMigrationsPath() string {
-	return filepath.Join("migrations", "sql")
+	return "migrations"
 }
 
 func printUsage() {

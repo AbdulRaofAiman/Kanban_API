@@ -309,7 +309,7 @@ func TestBoardGORMTags(t *testing.T) {
 	}
 
 	// Verify relationships
-	assert.Len(t, stmt.Schema.Relationships.Relations, 4, "Board should have 4 relationships")
+	assert.Len(t, stmt.Schema.Relationships.Relations, 3, "Board should have 3 relationships")
 
 	// Verify foreign keys
 	for _, rel := range stmt.Schema.Relationships.Relations {

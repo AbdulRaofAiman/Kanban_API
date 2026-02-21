@@ -409,69 +409,6 @@ func TestTaskLabelDatabase(t *testing.T) {
 
 	taskID := uuid.NewString()
 	task := Task{
-		ID:         taskID,
-		ColumnID:   columnID,
-		Title:      "Test Task",
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
-	}
-	err = db.Create(&task).Error
-	assert.NoError(t, err, "Failed to create test task")
-
-	labelID := uuid.NewString()
-	label := Label{
-		ID:        labelID,
-		Name:      "Test Label",
-		Color:     "#FF0000",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err = db.Create(&label).Error
-	assert.NoError(t, err, "Failed to create test label")
-
-	// Create TaskLabel association
-	taskLabel := TaskLabel{
-		TaskID:    taskID,
-		LabelID:   labelID,
-		CreatedAt: time.Now(),
-	}
-	err = db.Create(&taskLabel).Error
-	assert.NoError(t, err, "Failed to create TaskLabel")
-
-	// Verify TaskLabel was created
-	var retrievedTaskLabel TaskLabel
-	err = db.First(&retrievedTaskLabel, "task_id = ? AND label_id = ?", taskID, labelID).Error
-	assert.NoError(t, err, "Failed to retrieve TaskLabel")
-	assert.Equal(t, taskID, retrievedTaskLabel.TaskID, "TaskID should match")
-	assert.Equal(t, labelID, retrievedTaskLabel.LabelID, "LabelID should match")
-}
-	err := db.Create(&user).Error
-	assert.NoError(t, err, "Failed to create test user")
-
-	boardID := uuid.NewString()
-	board := Board{
-		ID:        boardID,
-		Title:     "Test Board",
-		Color:     "#FF5733",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err = db.Create(&board).Error
-	assert.NoError(t, err, "Failed to create test board")
-
-	columnID := uuid.NewString()
-	column := Column{
-		ID:        columnID,
-		Title:     "To Do",
-		Order:     1,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err = db.Create(&column).Error
-	assert.NoError(t, err, "Failed to create test column")
-
-	taskID := uuid.NewString()
-	task := Task{
 		ID:        taskID,
 		ColumnID:  columnID,
 		Title:     "Test Task",

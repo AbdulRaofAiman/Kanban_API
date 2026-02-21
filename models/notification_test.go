@@ -20,6 +20,17 @@ func setupNotificationTestDB(t *testing.T) *gorm.DB {
 	err = db.AutoMigrate(&User{}, &Notification{})
 	require.NoError(t, err, "Failed to migrate tables")
 
+	// Migrate audit_logs table for User model hooks
+	type AuditLog struct {
+		ID        string    `gorm:"primaryKey;type:varchar(36)"`
+		UserID    string    `gorm:"not null;type:varchar(36);index"`
+		Action    string    `gorm:"not null;type:varchar(50)"`
+		Message   string    `gorm:"type:text"`
+		CreatedAt time.Time `gorm:"autoCreateTime"`
+	}
+	err = db.Table("audit_logs").AutoMigrate(&AuditLog{})
+	require.NoError(t, err, "Failed to migrate audit_logs table")
+
 	return db
 }
 
@@ -27,7 +38,9 @@ func setupNotificationTestDB(t *testing.T) *gorm.DB {
 func createTestNotificationUser(t *testing.T, db *gorm.DB) *User {
 	user := &User{
 		ID:        uuid.New().String(),
+		Username:  "testuser",
 		Email:     "test@example.com",
+		Password:  "testpass123",
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -62,7 +75,7 @@ func TestNotificationModel(t *testing.T) {
 
 		// Verify the notification was created correctly
 		var dbNotification Notification
-		err = db.First(&dbNotification, notification.ID).Error
+		err = db.First(&dbNotification, "id = ?", notification.ID).Error
 		require.NoError(t, err, "Failed to retrieve notification")
 
 		assert.Equal(t, notification.ID, dbNotification.ID)
@@ -127,7 +140,7 @@ func TestNotificationRelationships(t *testing.T) {
 
 		// Test eager loading
 		var dbNotification Notification
-		err = db.Preload("User").First(&dbNotification, notification.ID).Error
+		err = db.Preload("User").First(&dbNotification, "id = ?", notification.ID).Error
 		require.NoError(t, err, "Failed to preload user")
 
 		assert.NotNil(t, dbNotification.User, "User should be loaded")
@@ -138,7 +151,9 @@ func TestNotificationRelationships(t *testing.T) {
 	t.Run("cascade delete when user is deleted", func(t *testing.T) {
 		newUser := &User{
 			ID:        uuid.New().String(),
+			Username:  "testuser2",
 			Email:     "test2@example.com",
+			Password:  "testpass123",
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
@@ -160,7 +175,7 @@ func TestNotificationRelationships(t *testing.T) {
 
 		// Verify notification is soft deleted
 		var dbNotification Notification
-		err = db.Unscoped().First(&dbNotification, notification.ID).Error
+		err = db.Unscoped().First(&dbNotification, "id = ?", notification.ID).Error
 		require.NoError(t, err, "Notification should still exist in database (soft deleted)")
 
 		assert.NotNil(t, dbNotification.DeletedAt, "DeletedAt should be set")
