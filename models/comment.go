@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -24,4 +25,12 @@ type Comment struct {
 // TableName specifies the table name for Comment model
 func (Comment) TableName() string {
 	return "comments"
+}
+
+// BeforeCreate is a GORM hook called before creating a comment
+func (c *Comment) BeforeCreate(tx *gorm.DB) error {
+	if c.ID == "" {
+		c.ID = uuid.NewString()
+	}
+	return nil
 }

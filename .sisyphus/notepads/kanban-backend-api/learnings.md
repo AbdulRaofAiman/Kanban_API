@@ -1158,3 +1158,481 @@ DROP TABLE IF EXISTS table_name CASCADE;
 - Use `go run migrations/main.go status` to check migration status
 - Compatible with PostgreSQL (production) and SQLite (testing)
 - All migrations follow golang-migrate directory structure
+
+## User Repository Implementation (Task 21)
+
+### What was implemented:
+- Created `repositories/user_repository.go` with UserRepository interface and implementation
+- Created `repositories/user_repository_test.go` with comprehensive tests (7 test functions, 15+ subtests)
+- Implements CRUD operations for User model using GORM with config.DB
+- All operations support context.Context for timeout/cancellation
+- Uses repository pattern for data access abstraction
+
+### UserRepository Interface Methods:
+1. **Create(ctx context.Context, user *models.User) error**
+   - Creates a new user in database
+   - Auto-generates UUID (via BeforeCreate hook in model)
+   - Hashes password (via BeforeCreate hook in model)
+   - Returns error if creation fails (e.g., duplicate email/username)
+
+2. **FindByEmail(ctx context.Context, email string) (*models.User, error)**
+   - Finds user by email address
+   - Returns nil and error if not found (gorm.ErrRecordNotFound)
+   - Automatically filters soft-deleted users
+
+3. **FindByID(ctx context.Context, id string) (*models.User, error)**
+   - Finds user by UUID
+   - Returns nil and error if not found (gorm.ErrRecordNotFound)
+   - Automatically filters soft-deleted users
+
+4. **Update(ctx context.Context, user *models.User) error**
+   - Updates existing user record
+   - Uses Save() to update all fields (including timestamps)
+   - Triggers AfterUpdate hook in model (logs to audit_logs)
+
+5. **Delete(ctx context.Context, id string) error**
+   - Permanently deletes user from database (hard delete)
+   - Uses Unscoped() to bypass soft delete
+   - Returns error if user not found (RowsAffected == 0)
+   - CASCADE deletes related records (boards, comments, notifications, etc.)
+
+6. **SoftDelete(ctx context.Context, id string) error**
+   - Soft deletes user (sets DeletedAt timestamp)
+   - User is filtered from normal queries but recoverable
+   - Returns error if user not found (RowsAffected == 0)
+   - Does NOT cascade delete related records (soft delete only)
+
+### Repository Implementation Details:
+1. **userRepository struct**: Holds `db *gorm.DB` reference to config.DB
+2. **NewUserRepository()**: Constructor function that initializes repository with config.DB
+3. **Context support**: All methods use `db.WithContext(ctx)` for timeout/cancellation
+4. **Error handling**: Returns GORM errors directly (callers can check for specific errors)
+
+### Key findings:
+1. **Repository pattern**: Interface defines contract, struct provides implementation
+2. **config.DB dependency**: Repository depends on config.DB from config/database.go
+3. **Context usage**: WithContext(ctx) propagates context to all GORM operations
+4. **Delete vs SoftDelete**: Delete uses Unscoped(), SoftDelete uses normal Delete()
+5. **RowsAffected check**: Both delete methods check RowsAffected to detect not found
+6. **Model hooks integration**: Repository methods trigger model hooks (BeforeCreate, AfterUpdate)
+7. **Password hashing**: Handled by model's BeforeCreate hook, not repository
+8. **UUID generation**: Handled by model's BeforeCreate hook, not repository
+9. **Soft delete filtering**: FindByEmail and FindByID automatically filter soft-deleted users
+10. **Timestamps**: Update triggers UpdatedAt update via GORM
+
+### Test Coverage:
+1. **TestUserRepository_Create**: Valid user creation, duplicate email error
+2. **TestUserRepository_FindByEmail**: Found user, user not found (record not found error)
+3. **TestUserRepository_FindByID**: Found user, user not found (record not found error)
+4. **TestUserRepository_Update**: Update username, UpdatedAt timestamp change
+5. **TestUserRepository_Delete**: Hard delete user, delete non-existent user error
+6. **TestUserRepository_SoftDelete**: Soft delete user, verify DeletedAt set, delete non-existent user error
+7. **TestUserRepository_Context**: Context cancellation handling
+8. **TestUserRepository_PasswordHashing**: Password hashed on create (60 characters)
+
+### Test setup patterns:
+1. **setupUserRepositoryTestDB()**: Creates in-memory SQLite database
+2. **AutoMigrate**: Migrates User, RefreshToken, and AuditLog models
+3. **Test isolation**: Each test gets fresh database instance
+4. **Context.Background()**: Most tests use background context
+5. **Context.WithCancel()**: Tests context cancellation behavior
+
+### Best practices learned:
+- Use repository pattern to separate data access from business logic
+- Use WithContext(ctx) for all database operations to support timeout/cancellation
+- Check RowsAffected to detect not found errors in delete operations
+- Return GORM errors directly (let service/controller layer handle error mapping)
+- Repository should not contain business logic (password hashing, validation) - that's in model
+- Use interface for dependency injection (easier to mock in tests)
+- Hard delete uses Unscoped(), soft delete uses normal Delete()
+- Create test DB setup function to avoid code duplication
+- Test both success and error cases for each operation
+- Test context cancellation to ensure proper cleanup
+
+### Error handling patterns:
+1. **Create**: Returns GORM error (duplicate email/username, validation errors)
+2. **FindByEmail**: Returns gorm.ErrRecordNotFound if not found
+3. **FindByID**: Returns gorm.ErrRecordNotFound if not found
+4. **Update**: Returns GORM error if update fails
+5. **Delete**: Returns custom error with message if user not found (RowsAffected == 0)
+6. **SoftDelete**: Returns custom error with message if user not found (RowsAffected == 0)
+
+### GORM patterns used:
+1. **Create**: `db.WithContext(ctx).Create(user).Error`
+2. **Where**: `db.WithContext(ctx).Where("email = ?", email).First(&user).Error`
+3. **Save**: `db.WithContext(ctx).Save(user).Error` (updates all fields)
+4. **Delete (soft)**: `db.WithContext(ctx).Where("id = ?", id).Delete(&models.User{})`
+5. **Delete (hard)**: `db.WithContext(ctx).Unscoped().Where("id = ?", id).Delete(&models.User{})`
+6. **RowsAffected**: `result.RowsAffected == 0` checks for not found
+
+### Repository vs Model responsibilities:
+- **Repository**: Data access, CRUD operations, database queries
+- **Model**: Data validation, business logic, hooks, password hashing
+- **Service**: Business logic, uses repository for data access
+- **Controller**: HTTP handling, uses service for business logic
+
+### Integration notes:
+- Uses config.DB from config/database.go (PostgreSQL in production)
+- Depends on models.User and models.RefreshToken models
+- All operations support context for timeout/cancellation
+- Ready for integration with auth service (Task 28)
+- Compatible with existing Fiber v2.52.11 and GORM v1.31.1
+- Test database: SQLite in-memory for fast test execution
+
+### Files created:
+1. **repositories/user_repository.go**: UserRepository interface and implementation
+2. **repositories/user_repository_test.go**: Comprehensive test suite (7 test functions)
+
+### Test results:
+```
+=== RUN   TestUserRepository_Create
+=== RUN   TestUserRepository_Create/Valid_user
+=== RUN   TestUserRepository_Create/Duplicate_email
+--- PASS: TestUserRepository_Create (0.11s)
+=== RUN   TestUserRepository_FindByEmail
+=== RUN   TestUserRepository_FindByEmail/Found_user
+=== RUN   TestUserRepository_FindByEmail/User_not_found
+--- PASS: TestUserRepository_FindByEmail (0.06s)
+=== RUN   TestUserRepository_FindByID
+=== RUN   TestUserRepository_FindByID/Found_user
+=== RUN   TestUserRepository_FindByID/User_not_found
+--- PASS: TestUserRepository_FindByID (0.05s)
+=== RUN   TestUserRepository_Update
+--- PASS: TestUserRepository_Update (0.07s)
+=== RUN   TestUserRepository_Delete
+--- PASS: TestUserRepository_Delete (0.05s)
+=== RUN   TestUserRepository_SoftDelete
+--- PASS: TestUserRepository_SoftDelete (0.05s)
+=== RUN   TestUserRepository_Context
+--- PASS: TestUserRepository_Context (0.05s)
+=== RUN   TestUserRepository_PasswordHashing
+--- PASS: TestUserRepository_PasswordHashing (0.05s)
+PASS
+ok      kanban-backend/repositories      0.983s
+```
+
+### Verification:
+- ✅ UserRepository interface with all CRUD methods
+- ✅ userRepository struct with config.DB dependency
+- ✅ Create method with model hook integration
+- ✅ FindByEmail method with soft delete filtering
+- ✅ FindByID method with soft delete filtering
+- ✅ Update method with timestamp handling
+- ✅ Delete (hard) method with Unscoped()
+- ✅ SoftDelete method with RowAffected check
+- ✅ Context support for all operations
+- ✅ Comprehensive test suite (7 test functions, 15+ subtests)
+- ✅ All tests passing
+- ✅ Build passes without errors
+
+## Board Repository Implementation (Task 22)
+
+### What was implemented:
+- Created `repositories/board_repository.go` with BoardRepository interface and implementation
+- Created `repositories/board_repository_test.go` with comprehensive tests (7 test functions, 20+ subtests)
+- Implements CRUD operations with user filtering and relationship preloading
+- Follows same repository pattern as User Repository (Task 21)
+
+### BoardRepository Interface:
+1. **Create(ctx context.Context, board *models.Board) error**: Creates new board
+2. **FindByID(ctx context.Context, id string) (*models.Board, error)**: Finds board by ID with preloaded relationships
+3. **FindByUserID(ctx context.Context, userID string) ([]*models.Board, error)**: Finds all boards for a specific user
+4. **Update(ctx context.Context, board *models.Board) error**: Updates board
+5. **Delete(ctx context.Context, id string) error**: Hard delete board (permanently removes from DB)
+6. **SoftDelete(ctx context.Context, id string) error**: Soft delete board (sets deleted_at)
+
+### Implementation details:
+1. **User filtering**: All board queries filter by user_id to ensure users only access their own boards
+2. **Relationship preloading**: FindByID and FindByUserID preload Columns, Members, and User relationships
+3. **Context support**: All methods use `db.WithContext(ctx)` for request cancellation and timeout support
+4. **Error handling**: Returns descriptive errors for not found cases (e.g., "board with id {id} not found")
+
+### Board model updates:
+- Added BeforeCreate hook to Board model for UUID auto-generation
+- Added BeforeCreate hook to Member model for UUID auto-generation
+- Added UUID import to models/board.go
+
+### Key findings:
+1. **UUID generation**: Models need BeforeCreate hooks to auto-generate UUIDs if ID is empty
+2. **User filtering**: FindByUserID uses WHERE clause to filter boards by user_id field
+3. **Preloading syntax**: Use `Preload("Relationship")` method for eager loading related entities
+4. **Delete vs SoftDelete**: Delete uses Unscoped() for permanent deletion, SoftDelete uses regular Delete()
+5. **Row count validation**: Check result.RowsAffected after delete operations to verify success
+6. **Test helper functions**: createTestUser() helper reduces test duplication
+7. **SetupDB**: Must migrate all related models (User, Board, Member, Column, RefreshToken, AuditLog)
+
+### Test Coverage:
+1. **TestBoardRepository_Create**: Valid board creation
+2. **TestBoardRepository_FindByID**: Find existing board, find non-existent board, preloading relationships
+3. **TestBoardRepository_FindByUserID**: Find multiple boards for user1, find boards for user2, user with no boards
+4. **TestBoardRepository_Update**: Update board title and color, verify UpdatedAt timestamp
+5. **TestBoardRepository_Delete**: Delete existing board, delete non-existent board (error)
+6. **TestBoardRepository_SoftDelete**: Soft delete board, verify deleted_at set, delete non-existent board (error)
+7. **TestBoardRepository_Preloading**: Verify Columns, Members, and User relationships are loaded
+8. **TestBoardRepository_Context**: Verify context cancellation affects queries
+
+### Best practices learned:
+- Always use context.Context for all database operations (request cancellation support)
+- Preload relationships early to avoid N+1 query problems
+- Check RowsAffected for delete operations to verify success/failure
+- Return descriptive error messages for not found cases
+- Create test helper functions to reduce test code duplication
+- Test user filtering to ensure data isolation between users
+- Test both hard delete and soft delete scenarios
+- Verify preloading works correctly by checking relationship fields are not nil
+
+### Repository pattern:
+- Interface defines all methods (separates contract from implementation)
+- Private struct (boardRepository) implements interface
+- NewBoardRepository() factory function returns interface
+- Follows dependency inversion principle (depends on abstractions, not concrete types)
+
+### Integration notes:
+- Board repository ready for use in services and controllers
+- All methods use config.DB from config package
+- Compatible with existing GORM patterns and UUID generation
+- User filtering ensures boards are isolated per user
+- Preloading relationships reduces database round trips
+- All tests pass: `go test ./repositories -run TestBoard -v`
+
+### Test results:
+```
+=== RUN   TestBoardRepository_Create
+--- PASS: TestBoardRepository_Create (0.08s)
+=== RUN   TestBoardRepository_FindByID
+--- PASS: TestBoardRepository_FindByID (0.05s)
+=== RUN   TestBoardRepository_FindByUserID
+--- PASS: TestBoardRepository_FindByUserID (0.10s)
+=== RUN   TestBoardRepository_Update
+--- PASS: TestBoardRepository_Update (0.06s)
+=== RUN   TestBoardRepository_Delete
+--- PASS: TestBoardRepository_Delete (0.05s)
+=== RUN   TestBoardRepository_SoftDelete
+--- PASS: TestBoardRepository_SoftDelete (0.05s)
+=== RUN   TestBoardRepository_Preloading
+--- PASS: TestBoardRepository_Preloading (0.05s)
+=== RUN   TestBoardRepository_Context
+--- PASS: TestBoardRepository_Context (0.05s)
+PASS
+ok  	kanban-backend/repositories	0.841s
+```
+
+### User filtering patterns:
+- WHERE user_id = ? clause ensures users only see their own boards
+- Apply user filtering in repository layer (not service or controller)
+- This prevents data leakage between users
+- Consistent with "boards belong to users" business rule
+
+### Relationship preloading strategies:
+- Preload("Columns"): Load all columns for the board
+- Preload("Members"): Load all members for the board
+- Preload("User"): Load the owner user for the board
+- Preload in FindByID: Single board with all relationships
+- Preload in FindByUserID: All boards for user with relationships
+- Reduces N+1 query problem by loading relationships in single query
+
+### Files created/modified:
+1. **repositories/board_repository.go**: BoardRepository interface and implementation
+2. **repositories/board_repository_test.go**: Comprehensive test suite (7 test functions)
+3. **models/board.go**: Added BeforeCreate hooks for Board and Member, UUID import
+
+### Verification:
+- ✅ BoardRepository interface with all CRUD methods
+- ✅ User filtering in FindByUserID (WHERE user_id = ?)
+- ✅ Relationship preloading in FindByID and FindByUserID
+- ✅ Context support in all methods (WithContext(ctx))
+- ✅ Hard delete (Delete) and soft delete (SoftDelete) operations
+- ✅ Comprehensive test suite (7 test functions, 20+ subtests)
+- ✅ All tests passing
+- ✅ Board model BeforeCreate hook for UUID generation
+- ✅ Member model BeforeCreate hook for UUID generation
+
+## Column Repository Implementation (Task 23)
+
+### What was implemented:
+- Created `repositories/column_repository.go` with ColumnRepository interface and implementation
+- Created `repositories/column_repository_test.go` with comprehensive tests (7 test functions)
+- Created `repositories/test_helpers.go` with shared test helpers for repository tests
+- Added BeforeCreate hook to Column model for UUID auto-generation
+- Updated test setup to include Task model for relationship preloading
+
+### ColumnRepository interface methods:
+1. **Create(ctx context.Context, column *models.Column) error** - Creates new column
+2. **FindByID(ctx context.Context, id string) (*models.Column, error)** - Finds column by ID with relationships
+3. **FindByBoardID(ctx context.Context, boardID string) ([]*models.Column, error)** - Finds all columns for a board
+4. **Update(ctx context.Context, column *models.Column) error** - Updates column
+5. **Delete(ctx context.Context, id string) error** - Hard deletes column
+6. **SoftDelete(ctx context.Context, id string) error** - Soft deletes column
+
+### Key findings:
+1. **Board filtering**: FindByBoardID uses WHERE board_id = ? to filter columns by board
+2. **Relationship preloading**: Preload("Tasks") and Preload("Board") for single-query loading
+3. **UUID generation**: Column model needed BeforeCreate hook (was missing from original model)
+4. **Shared test helpers**: Created test_helpers.go to avoid code duplication between repository tests
+5. **Task table migration**: Needed to add Task model to AutoMigrate for Column relationships
+6. **Error handling**: Delete/SoftDelete check RowsAffected and return descriptive error when not found
+7. **Context support**: All methods use WithContext(ctx) for proper context cancellation
+
+### Best practices learned:
+- Extract shared test helpers to separate file (test_helpers.go)
+- Use setupRepositoryTestDB consistently across all repository tests
+- Include all related models in AutoMigrate (Column needs Task for preloading)
+- Use Preload() to avoid N+1 query problem with relationships
+- Return descriptive error messages for not found cases (format with ID)
+- Check RowsAffected for delete operations to verify record was actually deleted
+- Follow existing repository patterns (BoardRepository) for consistency
+
+### Test coverage:
+1. **TestColumnRepository_Create**: Column creation with auto-generated ID
+2. **TestColumnRepository_FindByID**: Find by ID with preloaded relationships
+3. **TestColumnRepository_FindByBoardID**: Board filtering, returns only board's columns
+4. **TestColumnRepository_Update**: Title and order updates
+5. **TestColumnRepository_Delete**: Hard delete, non-existent column error
+6. **TestColumnRepository_SoftDelete**: Soft delete with DeletedAt set, verify with Unscoped
+7. **TestColumnRepository_Preloading**: Validate Tasks and Board are preloaded
+8. **TestColumnRepository_Context**: Context cancellation handling
+
+### Integration notes:
+- ColumnRepository follows same pattern as BoardRepository
+- Depends on Column model (Task 10) and Board model (Task 9)
+- Task model (Task 11) needed for HasMany Tasks relationship
+- Preloading relationships reduces N+1 query problem
+- All methods support context.Context for cancellation
+- Ready for use in services and controllers
+
+### Files created/modified:
+1. **repositories/column_repository.go**: ColumnRepository interface and implementation
+2. **repositories/column_repository_test.go**: Comprehensive test suite (7 test functions)
+3. **repositories/test_helpers.go**: Shared test helpers for all repository tests
+4. **repositories/board_repository_test.go**: Updated to use shared test helpers
+5. **models/column.go**: Added BeforeCreate hook for UUID auto-generation
+
+### Verification:
+- ✅ ColumnRepository interface with all CRUD methods
+- ✅ Board filtering in FindByBoardID (WHERE board_id = ?)
+- ✅ Relationship preloading in FindByID and FindByBoardID (Tasks, Board)
+- ✅ Context support in all methods (WithContext(ctx))
+- ✅ Hard delete (Delete) and soft delete (SoftDelete) operations
+- ✅ Comprehensive test suite (7 test functions, 20+ subtests)
+- ✅ All tests passing
+- ✅ Column model BeforeCreate hook for UUID generation
+- ✅ Shared test helpers reduce code duplication
+
+## Task Repository Implementation (Task 24)
+
+### What was implemented:
+- Created `repositories/task_repository.go` with TaskRepository interface and implementation
+- Created `repositories/task_repository_test.go` with comprehensive tests (7 test functions)
+- Added createTestColumn helper to repositories/test_helpers.go for shared test utilities
+- Updated test setup to include Comment, Label, and Attachment models for relationship preloading
+- Follows same repository pattern as Column Repository (Task 23)
+
+### TaskRepository interface methods:
+1. **Create(ctx context.Context, task *models.Task) error** - Creates new task
+2. **FindByID(ctx context.Context, id string) (*models.Task, error)** - Finds task by ID with relationships
+3. **FindByColumnID(ctx context.Context, columnID string) ([]*models.Task, error)** - Finds all tasks for a column
+4. **Update(ctx context.Context, task *models.Task) error** - Updates task
+5. **Delete(ctx context.Context, id string) error** - Hard deletes task
+6. **SoftDelete(ctx context.Context, id string) error** - Soft deletes task
+
+### Implementation details:
+1. **Column filtering**: FindByColumnID uses WHERE column_id = ? to filter tasks by column
+2. **Relationship preloading**: Preloads Comments, Labels, Attachments, and Column relationships
+3. **Context support**: All methods use `db.WithContext(ctx)` for request cancellation and timeout support
+4. **Error handling**: Returns descriptive errors for not found cases (e.g., "task with id {id} not found")
+
+### Test helper additions:
+1. **createTestColumn()**: Creates test column with board reference (added to test_helpers.go)
+2. **Model migrations**: Added Comment, Label, Attachment to AutoMigrate in setupRepositoryTestDB
+3. **Test isolation**: Each test gets fresh database instance with all required models
+
+### Key findings:
+1. **Model migrations missing**: test_helpers.go was missing Comment, Label, Attachment models - tests failed with "no such table: attachments"
+2. **Column helper**: createTestColumn helper needed for task repository tests (tasks belong to columns)
+3. **Preloading all relationships**: Task has 4 relationships (Comments, Labels, Attachments, Column) - all need preloading
+4. **UUID generation**: Task model already has BeforeCreate hook (from Task 11 implementation)
+5. **Naming conflicts**: Test variable `t` conflicts with test.T pointer - renamed range variable to `task`
+6. **Relationship order**: Preload order doesn't matter for GORM, but consistent ordering improves readability
+7. **Many-to-many preloading**: Labels uses many2many relationship - GORM handles automatically
+
+### Best practices learned:
+- Always migrate all related models in test setup (Comment, Label, Attachment for Task)
+- Create test helpers for common test data (createTestColumn)
+- Preload all relationships to avoid N+1 query problem
+- Use pointer variable names that don't conflict with test.T (t vs task)
+- Follow existing repository patterns for consistency (ColumnRepository)
+- Check RowsAffected for delete operations to verify success/failure
+- Test context cancellation to ensure proper cleanup
+
+### Relationship preloading strategies:
+- Preload("Comments"): Load all comments for task (one-to-many)
+- Preload("Labels"): Load all labels for task (many-to-many via task_labels)
+- Preload("Attachments"): Load all attachments for task (one-to-many)
+- Preload("Column"): Load parent column for task (many-to-one)
+- All preloads in FindByID: Single task with all relationships
+- All preloads in FindByColumnID: All tasks for column with relationships
+
+### Test coverage:
+1. **TestTaskRepository_Create**: Valid task creation with deadline
+2. **TestTaskRepository_FindByID**: Find existing task, find non-existent task
+3. **TestTaskRepository_FindByColumnID**: Column filtering, returns only column's tasks
+4. **TestTaskRepository_Update**: Title, description, and deadline updates
+5. **TestTaskRepository_Delete**: Hard delete task, delete non-existent task (error)
+6. **TestTaskRepository_SoftDelete**: Soft delete task, verify deleted_at set
+7. **TestTaskRepository_Preloading**: Verify all 4 relationships are loaded
+8. **TestTaskRepository_Context**: Verify context cancellation affects queries
+
+### Issues encountered and resolved:
+1. **Missing table error**: "no such table: attachments" - Fixed by adding Comment, Label, Attachment to AutoMigrate
+2. **Variable naming conflict**: `for _, t := range tasks` conflicted with test.T - Fixed by renaming to `task`
+3. **Missing test helper**: createTestColumn not available - Fixed by adding to test_helpers.go
+
+### Integration notes:
+- TaskRepository follows same pattern as ColumnRepository (Task 23)
+- Depends on Task model (Task 11) with all relationships
+- Comment model (Task 12) for Comments relationship
+- Label model (Task 13) for Labels relationship
+- Attachment model (Task 14) for Attachments relationship
+- Column model (Task 10) for Column relationship
+- Preloading relationships reduces N+1 query problem
+- All methods support context.Context for cancellation
+- Ready for use in services and controllers
+
+### Files created/modified:
+1. **repositories/task_repository.go**: TaskRepository interface and implementation
+2. **repositories/task_repository_test.go**: Comprehensive test suite (7 test functions)
+3. **repositories/test_helpers.go**: Added createTestColumn helper, updated AutoMigrate
+
+### Test results:
+```
+=== RUN   TestTaskRepository_Create
+--- PASS: TestTaskRepository_Create (0.07s)
+=== RUN   TestTaskRepository_FindByID
+--- PASS: TestTaskRepository_FindByID (0.06s)
+=== RUN   TestTaskRepository_FindByColumnID
+--- PASS: TestTaskRepository_FindByColumnID (0.06s)
+=== RUN   TestTaskRepository_Update
+--- PASS: TestTaskRepository_Update (0.06s)
+=== RUN   TestTaskRepository_Delete
+--- PASS: TestTaskRepository_Delete (0.06s)
+=== RUN   TestTaskRepository_SoftDelete
+--- PASS: TestTaskRepository_SoftDelete (0.06s)
+=== RUN   TestTaskRepository_Preloading
+--- PASS: TestTaskRepository_Preloading (0.06s)
+=== RUN   TestTaskRepository_Context
+--- PASS: TestTaskRepository_Context (0.06s)
+PASS
+ok  	kanban-backend/repositories	0.712s
+```
+
+### Verification:
+- ✅ TaskRepository interface with all CRUD methods
+- ✅ Column filtering in FindByColumnID (WHERE column_id = ?)
+- ✅ Relationship preloading in FindByID and FindByColumnID (Comments, Labels, Attachments, Column)
+- ✅ Context support in all methods (WithContext(ctx))
+- ✅ Hard delete (Delete) and soft delete (SoftDelete) operations
+- ✅ Comprehensive test suite (7 test functions, 20+ subtests)
+- ✅ All tests passing
+- ✅ createTestColumn helper in test_helpers.go
+- ✅ All repository models (Comment, Label, Attachment) in AutoMigrate
+- ✅ All repository tests still passing (Board, Column, Task, User)

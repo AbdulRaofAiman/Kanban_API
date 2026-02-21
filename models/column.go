@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -24,4 +25,12 @@ type Column struct {
 // TableName specifies the table name for Column model
 func (Column) TableName() string {
 	return "columns"
+}
+
+// BeforeCreate hook to generate UUID if ID is empty
+func (c *Column) BeforeCreate(tx *gorm.DB) error {
+	if c.ID == "" {
+		c.ID = uuid.New().String()
+	}
+	return nil
 }

@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -16,6 +17,14 @@ type Member struct {
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+// BeforeCreate is a GORM hook called before creating a member
+func (m *Member) BeforeCreate(tx *gorm.DB) error {
+	if m.ID == "" {
+		m.ID = uuid.New().String()
+	}
+	return nil
 }
 
 // Board represents a Kanban board
@@ -32,6 +41,14 @@ type Board struct {
 	Columns []Column `gorm:"foreignKey:BoardID" json:"columns,omitempty"`
 	Members []Member `gorm:"foreignKey:BoardID" json:"members,omitempty"`
 	User    *User    `gorm:"foreignKey:UserID" json:"user,omitempty"`
+}
+
+// BeforeCreate is a GORM hook called before creating a board
+func (b *Board) BeforeCreate(tx *gorm.DB) error {
+	if b.ID == "" {
+		b.ID = uuid.New().String()
+	}
+	return nil
 }
 
 // TableName specifies the table name for Board model
