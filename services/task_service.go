@@ -14,6 +14,8 @@ type TaskService interface {
 	Create(ctx context.Context, userID, columnID, title, description string, deadline *time.Time) (*models.Task, error)
 	FindByID(ctx context.Context, taskID, userID string) (*models.Task, error)
 	FindByColumnID(ctx context.Context, columnID, userID string) ([]*models.Task, error)
+	FindByColumnIDWithFilters(ctx context.Context, columnID, userID string, title string, page, limit int) ([]*models.Task, int, error)
+	Search(ctx context.Context, boardID, userID string, keyword string, page, limit int) ([]*models.Task, int, error)
 	Update(ctx context.Context, taskID, userID, title, description string, deadline *time.Time) (*models.Task, error)
 	Delete(ctx context.Context, taskID, userID string) error
 	Move(ctx context.Context, taskID, columnID, userID string) error
@@ -160,4 +162,41 @@ func (s *taskService) Move(ctx context.Context, taskID, columnID, userID string)
 
 	task.ColumnID = columnID
 	return s.taskRepo.Update(ctx, task)
+}
+
+func (s *taskService) FindByColumnIDWithFilters(ctx context.Context, columnID, userID string, title string, page, limit int) ([]*models.Task, int, error) {
+	column, err := s.columnRepo.FindByID(ctx, columnID)
+	if err != nil {
+		return nil, 0, utils.NewNotFound("column not found")
+	}
+
+	if column.Board.UserID != userID {
+		return nil, 0, utils.NewUnauthorized("you do not have access to this column")
+	}
+
+	tasks, total, err := s.taskRepo.FindByColumnIDWithFilters(ctx, columnID, title, page, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return tasks, total, nil
+}
+
+func (s *taskService) Search(ctx context.Context, boardID, userID string, keyword string, page, limit int) ([]*models.Task, int, error) {
+	boardRepo := repositories.NewBoardRepository()
+	board, err := boardRepo.FindByID(ctx, boardID)
+	if err != nil {
+		return nil, 0, utils.NewNotFound("board not found")
+	}
+
+	if board.UserID != userID {
+		return nil, 0, utils.NewUnauthorized("you do not have access to this board")
+	}
+
+	tasks, total, err := s.taskRepo.Search(ctx, boardID, keyword, page, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return tasks, total, nil
 }

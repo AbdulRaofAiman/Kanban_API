@@ -11,6 +11,7 @@ type CommentService interface {
 	Create(ctx context.Context, taskID, userID, content string) (*models.Comment, error)
 	FindByID(ctx context.Context, id, userID string) (*models.Comment, error)
 	FindByTaskID(ctx context.Context, taskID, userID string) ([]*models.Comment, error)
+	FindByTaskIDWithPagination(ctx context.Context, taskID, userID string, page, limit int) ([]*models.Comment, int, error)
 	Update(ctx context.Context, id, userID, content string) (*models.Comment, error)
 	Delete(ctx context.Context, id, userID string) error
 }
@@ -118,4 +119,26 @@ func (s *commentService) Delete(ctx context.Context, id, userID string) error {
 	}
 
 	return nil
+}
+
+func (s *commentService) FindByTaskIDWithPagination(ctx context.Context, taskID, userID string, page, limit int) ([]*models.Comment, int, error) {
+	task, err := s.taskRepo.FindByID(ctx, taskID)
+	if err != nil {
+		return nil, 0, utils.NewNotFound("task not found")
+	}
+
+	if task.Column == nil {
+		return nil, 0, utils.NewNotFound("column not found for task")
+	}
+
+	if task.Column.Board.UserID != userID {
+		return nil, 0, utils.NewUnauthorized("you do not have access to this task")
+	}
+
+	comments, total, err := s.commentRepo.FindByTaskIDWithPagination(ctx, taskID, page, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return comments, total, nil
 }

@@ -91,6 +91,24 @@ func (m *mockAttachmentRepository) SoftDelete(ctx context.Context, id string) er
 	return m.Delete(ctx, id)
 }
 
+func (m *mockAttachmentRepository) FindByTaskIDWithPagination(ctx context.Context, taskID string, offset, limit int) ([]*models.Attachment, int, error) {
+	var attachments []*models.Attachment
+	for _, attachment := range m.attachments {
+		if attachment.TaskID == taskID {
+			task, _ := m.taskRepo.FindByID(ctx, attachment.TaskID)
+			attachments = append(attachments, &models.Attachment{
+				ID:       attachment.ID,
+				TaskID:   attachment.TaskID,
+				FileName: attachment.FileName,
+				FileURL:  attachment.FileURL,
+				FileSize: attachment.FileSize,
+				Task:     task,
+			})
+		}
+	}
+	return attachments, len(attachments), nil
+}
+
 type mockTaskRepositoryForAttachment struct {
 	tasks map[string]*models.Task
 }
@@ -129,6 +147,14 @@ func (m *mockTaskRepositoryForAttachment) Create(ctx context.Context, task *mode
 
 func (m *mockTaskRepositoryForAttachment) FindByColumnID(ctx context.Context, columnID string) ([]*models.Task, error) {
 	return nil, nil
+}
+
+func (m *mockTaskRepositoryForAttachment) FindByColumnIDWithFilters(ctx context.Context, columnID string, title string, offset, limit int) ([]*models.Task, int, error) {
+	return nil, 0, nil
+}
+
+func (m *mockTaskRepositoryForAttachment) Search(ctx context.Context, boardID string, keyword string, offset, limit int) ([]*models.Task, int, error) {
+	return nil, 0, nil
 }
 
 func (m *mockTaskRepositoryForAttachment) Update(ctx context.Context, task *models.Task) error {

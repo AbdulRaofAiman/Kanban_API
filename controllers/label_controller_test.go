@@ -14,13 +14,15 @@ import (
 )
 
 type mockLabelService struct {
-	createFunc         func(ctx context.Context, name, color string) (*models.Label, error)
-	findByIDFunc       func(ctx context.Context, id string) (*models.Label, error)
-	findAllFunc        func(ctx context.Context) ([]*models.Label, error)
-	updateFunc         func(ctx context.Context, id, name, color string) (*models.Label, error)
-	deleteFunc         func(ctx context.Context, id string) error
-	addToTaskFunc      func(ctx context.Context, taskID, labelID, userID string) error
-	removeFromTaskFunc func(ctx context.Context, taskID, labelID, userID string) error
+	createFunc                func(ctx context.Context, name, color string) (*models.Label, error)
+	findByIDFunc              func(ctx context.Context, id string) (*models.Label, error)
+	findAllFunc               func(ctx context.Context) ([]*models.Label, error)
+	findAllWithPaginationFunc func(ctx context.Context, page, limit int) ([]*models.Label, int, error)
+	searchFunc                func(ctx context.Context, keyword string, page, limit int) ([]*models.Label, int, error)
+	updateFunc                func(ctx context.Context, id, name, color string) (*models.Label, error)
+	deleteFunc                func(ctx context.Context, id string) error
+	addToTaskFunc             func(ctx context.Context, taskID, labelID, userID string) error
+	removeFromTaskFunc        func(ctx context.Context, taskID, labelID, userID string) error
 }
 
 func (m *mockLabelService) Create(ctx context.Context, name, color string) (*models.Label, error) {
@@ -87,6 +89,24 @@ func (m *mockLabelService) RemoveFromTask(ctx context.Context, taskID, labelID, 
 	return nil
 }
 
+func (m *mockLabelService) FindAllWithPagination(ctx context.Context, page, limit int) ([]*models.Label, int, error) {
+	if m.findAllWithPaginationFunc != nil {
+		return m.findAllWithPaginationFunc(ctx, page, limit)
+	}
+	return []*models.Label{
+		{ID: "label-1", Name: "Bug", Color: "#FF0000"},
+	}, 1, nil
+}
+
+func (m *mockLabelService) Search(ctx context.Context, keyword string, page, limit int) ([]*models.Label, int, error) {
+	if m.searchFunc != nil {
+		return m.searchFunc(ctx, keyword, page, limit)
+	}
+	return []*models.Label{
+		{ID: "label-1", Name: "Bug", Color: "#FF0000"},
+	}, 1, nil
+}
+
 func TestNewLabelController(t *testing.T) {
 	mockService := &mockLabelService{}
 	ctrl := NewLabelController(mockService)
@@ -137,7 +157,15 @@ func TestLabelController_Create_ValidationError(t *testing.T) {
 func TestLabelController_FindAll_Success(t *testing.T) {
 	app := fiber.New()
 
-	mockService := &mockLabelService{}
+	mockService := &mockLabelService{
+		findAllWithPaginationFunc: func(ctx context.Context, page, limit int) ([]*models.Label, int, error) {
+			labels := []*models.Label{
+				{ID: "label-1", Name: "Bug", Color: "#FF0000"},
+				{ID: "label-2", Name: "Feature", Color: "#00FF00"},
+			}
+			return labels, 2, nil
+		},
+	}
 	ctrl := NewLabelController(mockService)
 	app.Get("/labels", ctrl.FindAll)
 
@@ -154,6 +182,7 @@ func TestLabelController_FindAll_Success(t *testing.T) {
 	assert.Contains(t, respBody, `"success":true`)
 	assert.Contains(t, respBody, `"label-1"`)
 	assert.Contains(t, respBody, `"label-2"`)
+	assert.Contains(t, respBody, `"pagination"`)
 }
 
 func TestLabelController_Update_Success(t *testing.T) {

@@ -80,6 +80,40 @@ func (m *mockBoardRepository) SoftDelete(ctx context.Context, id string) error {
 	return m.Delete(ctx, id)
 }
 
+func (m *mockBoardRepository) FindByUserIDWithFilters(ctx context.Context, userID string, title string, page, limit int) ([]*models.Board, int, error) {
+	var boards []*models.Board
+	for _, board := range m.boards {
+		if board.UserID == userID && (title == "" || board.Title == title) {
+			boards = append(boards, board)
+		}
+	}
+	offset := (page - 1) * limit
+	if offset >= len(boards) {
+		return []*models.Board{}, 0, nil
+	}
+	if offset+limit > len(boards) {
+		return boards[offset:], len(boards), nil
+	}
+	return boards[offset : offset+limit], len(boards), nil
+}
+
+func (m *mockBoardRepository) Search(ctx context.Context, userID string, keyword string, page, limit int) ([]*models.Board, int, error) {
+	var boards []*models.Board
+	for _, board := range m.boards {
+		if board.UserID == userID && (board.Title == keyword) {
+			boards = append(boards, board)
+		}
+	}
+	offset := (page - 1) * limit
+	if offset >= len(boards) {
+		return []*models.Board{}, 0, nil
+	}
+	if offset+limit > len(boards) {
+		return boards[offset:], len(boards), nil
+	}
+	return boards[offset : offset+limit], len(boards), nil
+}
+
 type mockColumnRepository struct {
 	columns map[string]*models.Column
 }

@@ -16,6 +16,8 @@ type LabelService interface {
 	Create(ctx context.Context, name, color string) (*models.Label, error)
 	FindByID(ctx context.Context, id string) (*models.Label, error)
 	FindAll(ctx context.Context) ([]*models.Label, error)
+	FindAllWithPagination(ctx context.Context, page, limit int) ([]*models.Label, int, error)
+	Search(ctx context.Context, keyword string, page, limit int) ([]*models.Label, int, error)
 	Update(ctx context.Context, id, name, color string) (*models.Label, error)
 	Delete(ctx context.Context, id string) error
 	AddToTask(ctx context.Context, taskID, labelID, userID string) error
@@ -160,4 +162,22 @@ func (s *labelService) RemoveFromTask(ctx context.Context, taskID, labelID, user
 	}
 
 	return nil
+}
+
+func (s *labelService) FindAllWithPagination(ctx context.Context, page, limit int) ([]*models.Label, int, error) {
+	labels, total, err := s.labelRepo.FindAllWithPagination(ctx, page, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return labels, total, nil
+}
+
+func (s *labelService) Search(ctx context.Context, keyword string, page, limit int) ([]*models.Label, int, error) {
+	labels, total, err := s.labelRepo.Search(ctx, keyword, page, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return labels, total, nil
 }

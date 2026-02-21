@@ -68,6 +68,16 @@ func (m *mockCommentRepository) SoftDelete(ctx context.Context, id string) error
 	return m.Delete(ctx, id)
 }
 
+func (m *mockCommentRepository) FindByTaskIDWithPagination(ctx context.Context, taskID string, page, limit int) ([]*models.Comment, int, error) {
+	var comments []*models.Comment
+	for _, comment := range m.comments {
+		if comment.TaskID == taskID {
+			comments = append(comments, comment)
+		}
+	}
+	return comments, len(comments), nil
+}
+
 type mockTaskRepositoryForComment struct {
 	tasks map[string]*models.Task
 }
@@ -110,6 +120,14 @@ func (m *mockTaskRepositoryForComment) Delete(ctx context.Context, id string) er
 
 func (m *mockTaskRepositoryForComment) SoftDelete(ctx context.Context, id string) error {
 	return nil
+}
+
+func (m *mockTaskRepositoryForComment) FindByColumnIDWithFilters(ctx context.Context, columnID string, title string, offset, limit int) ([]*models.Task, int, error) {
+	return nil, 0, nil
+}
+
+func (m *mockTaskRepositoryForComment) Search(ctx context.Context, boardID string, keyword string, offset, limit int) ([]*models.Task, int, error) {
+	return nil, 0, nil
 }
 
 func TestNewCommentService(t *testing.T) {

@@ -14,6 +14,8 @@ type LabelRepository interface {
 	Create(ctx context.Context, label *models.Label) error
 	FindByID(ctx context.Context, id string) (*models.Label, error)
 	FindAll(ctx context.Context) ([]*models.Label, error)
+	FindAllWithPagination(ctx context.Context, page, limit int) ([]*models.Label, int, error)
+	Search(ctx context.Context, keyword string, page, limit int) ([]*models.Label, int, error)
 	Update(ctx context.Context, label *models.Label) error
 	Delete(ctx context.Context, id string) error
 	SoftDelete(ctx context.Context, id string) error
@@ -81,4 +83,41 @@ func (r *labelRepository) SoftDelete(ctx context.Context, id string) error {
 		return fmt.Errorf("label with id %s not found", id)
 	}
 	return nil
+}
+
+func (r *labelRepository) FindAllWithPagination(ctx context.Context, page, limit int) ([]*models.Label, int, error) {
+	var labels []*models.Label
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&models.Label{})
+
+	query.Count(&total)
+
+	offset := (page - 1) * limit
+	err := query.Preload("Tasks").
+		Order("name ASC").
+		Offset(offset).
+		Limit(limit).
+		Find(&labels).Error
+
+	return labels, int(total), err
+}
+
+func (r *labelRepository) Search(ctx context.Context, keyword string, page, limit int) ([]*models.Label, int, error) {
+	var labels []*models.Label
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&models.Label{}).
+		Where("name ILIKE ? OR color ILIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+
+	query.Count(&total)
+
+	offset := (page - 1) * limit
+	err := query.Preload("Tasks").
+		Order("name ASC").
+		Offset(offset).
+		Limit(limit).
+		Find(&labels).Error
+
+	return labels, int(total), err
 }

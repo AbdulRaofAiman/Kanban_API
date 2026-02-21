@@ -14,6 +14,7 @@ type CommentRepository interface {
 	Create(ctx context.Context, comment *models.Comment) error
 	FindByID(ctx context.Context, id string) (*models.Comment, error)
 	FindByTaskID(ctx context.Context, taskID string) ([]*models.Comment, error)
+	FindByTaskIDWithPagination(ctx context.Context, taskID string, page, limit int) ([]*models.Comment, int, error)
 	Update(ctx context.Context, comment *models.Comment) error
 	Delete(ctx context.Context, id string) error
 	SoftDelete(ctx context.Context, id string) error
@@ -84,4 +85,23 @@ func (r *commentRepository) SoftDelete(ctx context.Context, id string) error {
 		return fmt.Errorf("comment with id %s not found", id)
 	}
 	return nil
+}
+
+func (r *commentRepository) FindByTaskIDWithPagination(ctx context.Context, taskID string, page, limit int) ([]*models.Comment, int, error) {
+	var comments []*models.Comment
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&models.Comment{}).Where("task_id = ?", taskID)
+
+	query.Count(&total)
+
+	offset := (page - 1) * limit
+	err := query.Preload("User").
+		Preload("Task").
+		Order("created_at ASC").
+		Offset(offset).
+		Limit(limit).
+		Find(&comments).Error
+
+	return comments, int(total), err
 }

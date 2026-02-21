@@ -11,6 +11,7 @@ type AttachmentService interface {
 	Create(ctx context.Context, taskID, userID, fileName, fileURL string, fileSize int64) (*models.Attachment, error)
 	FindByID(ctx context.Context, id, userID string) (*models.Attachment, error)
 	FindByTaskID(ctx context.Context, taskID, userID string) ([]*models.Attachment, error)
+	FindByTaskIDWithPagination(ctx context.Context, taskID, userID string, page, limit int) ([]*models.Attachment, int, error)
 	Update(ctx context.Context, id, userID, fileName, fileURL string, fileSize int64) (*models.Attachment, error)
 	Delete(ctx context.Context, id, userID string) error
 }
@@ -137,4 +138,26 @@ func (s *attachmentService) Delete(ctx context.Context, id, userID string) error
 	}
 
 	return nil
+}
+
+func (s *attachmentService) FindByTaskIDWithPagination(ctx context.Context, taskID, userID string, page, limit int) ([]*models.Attachment, int, error) {
+	task, err := s.taskRepo.FindByID(ctx, taskID)
+	if err != nil {
+		return nil, 0, utils.NewNotFound("task not found")
+	}
+
+	if task.Column == nil {
+		return nil, 0, utils.NewNotFound("column not found for task")
+	}
+
+	if task.Column.Board.UserID != userID {
+		return nil, 0, utils.NewUnauthorized("you do not have access to this task")
+	}
+
+	attachments, total, err := s.attachmentRepo.FindByTaskIDWithPagination(ctx, taskID, page, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return attachments, total, nil
 }

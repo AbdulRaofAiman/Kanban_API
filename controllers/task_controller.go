@@ -134,7 +134,13 @@ func (ctrl *TaskController) FindByColumnID(c *fiber.Ctx) error {
 		return utils.ValidationError(c, "columnId", "column id is required")
 	}
 
-	tasks, err := ctrl.taskService.FindByColumnID(c.Context(), columnID, userID)
+	var req utils.PaginationRequest
+	c.QueryParser(&req)
+	utils.ValidatePagination(&req)
+
+	title := c.Query("title")
+
+	tasks, total, err := ctrl.taskService.FindByColumnIDWithFilters(c.Context(), columnID, userID, title, req.Page, req.Limit)
 	if err != nil {
 		var notFoundErr utils.ErrNotFound
 		if errors.As(err, &notFoundErr) {
@@ -147,7 +153,7 @@ func (ctrl *TaskController) FindByColumnID(c *fiber.Ctx) error {
 		return utils.Error(c, "Failed to find tasks", fiber.StatusInternalServerError)
 	}
 
-	return utils.Success(c, toTaskResponseList(tasks))
+	return utils.Success(c, utils.NewPaginatedResponse(toTaskResponseList(tasks), req.Page, req.Limit, total))
 }
 
 func (ctrl *TaskController) Update(c *fiber.Ctx) error {
@@ -238,4 +244,37 @@ func (ctrl *TaskController) Move(c *fiber.Ctx) error {
 	return utils.Success(c, fiber.Map{
 		"message": "Task moved successfully",
 	})
+}
+
+func (ctrl *TaskController) Search(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	boardID := c.Query("board_id")
+
+	if boardID == "" {
+		return utils.ValidationError(c, "board_id", "board_id is required")
+	}
+
+	var req utils.PaginationRequest
+	c.QueryParser(&req)
+	utils.ValidatePagination(&req)
+
+	keyword := c.Query("keyword")
+	if keyword == "" {
+		return utils.ValidationError(c, "keyword", "keyword is required")
+	}
+
+	tasks, total, err := ctrl.taskService.Search(c.Context(), boardID, userID, keyword, req.Page, req.Limit)
+	if err != nil {
+		var notFoundErr utils.ErrNotFound
+		if errors.As(err, &notFoundErr) {
+			return utils.Error(c, err.Error(), fiber.StatusNotFound)
+		}
+		var unauthorizedErr utils.ErrUnauthorized
+		if errors.As(err, &unauthorizedErr) {
+			return utils.Error(c, err.Error(), fiber.StatusUnauthorized)
+		}
+		return utils.Error(c, "Failed to search tasks", fiber.StatusInternalServerError)
+	}
+
+	return utils.Success(c, utils.NewPaginatedResponse(toTaskResponseList(tasks), req.Page, req.Limit, total))
 }

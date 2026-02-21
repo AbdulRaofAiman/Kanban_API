@@ -2187,3 +2187,285 @@ ok  	kanban-backend/routes	0.310s
 5. **Setup functions**: Create reusable test setup to reduce duplication
 6. **Request headers**: Set proper Authorization header format for auth testing
 
+---
+
+## Search, Filtering, and Pagination Implementation
+
+### Date: 2026-02-21
+
+### Overview
+Implemented search, filtering, and pagination functionality across all repositories, services, and controllers in the kanban-backend API.
+
+### Pagination Implementation Patterns
+
+**Pagination Helper (utils/pagination.go)**
+```go
+type PaginationRequest struct {
+    Page  int `query:"page"`
+    Limit int `query:"limit"`
+}
+
+type PaginationResponse struct {
+    Page       int `json:"page"`
+    Limit      int `json:"limit"`
+    Total      int `json:"total"`
+    TotalPages int `json:"total_pages"`
+}
+
+type PaginatedResponse struct {
+    Data       interface{}        `json:"data"`
+    Pagination PaginationResponse `json:"pagination"`
+}
+```
+
+**Key Functions**
+- `GetOffset(page, limit int) int`: Calculates the database offset based on page number
+- `GetTotalPages(total, limit int) int`: Calculates total pages from total records
+- `ValidatePagination(req *PaginationRequest)`: Validates and sets defaults (page=1, limit=20, max=100)
+
+### Search with GORM ILIKE
+
+**Case-Insensitive Search Pattern**
+```go
+func (r *boardRepository) Search(ctx context.Context, userID, keyword string, page, limit int) ([]*models.Board, int, error) {
+    var boards []*models.Board
+    var total int64
+
+    query := r.db.WithContext(ctx).Model(&models.Board{}).
+        Where("user_id = ?", userID).
+        Where("title ILIKE ? OR description ILIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+
+    query.Count(&total)
+
+    offset := (page - 1) * limit
+    err := query.Preload("Columns").
+        Preload("Members").
+        Preload("User").
+        Offset(offset).
+        Limit(limit).
+        Find(&boards).Error
+
+    return boards, int(total), err
+}
+```
+
+**Notes**
+- ILIKE is PostgreSQL-specific for case-insensitive pattern matching
+- For MySQL, use LIKE with LOWER() function
+- Always count total records before applying offset/limit
+- Return both data and total count for pagination metadata
+
+### Filtering Strategies
+
+**Dynamic Filtering Pattern**
+```go
+func (r *boardRepository) FindByUserIDWithFilters(ctx context.Context, userID string, title string, page, limit int) ([]*models.Board, int, error) {
+    var boards []*models.Board
+    var total int64
+
+    query := r.db.WithContext(ctx).Model(&models.Board{}).Where("user_id = ?", userID)
+
+    if title != "" {
+        query = query.Where("title ILIKE ?", "%"+title+"%")
+    }
+
+    query.Count(&total)
+
+    offset := (page - 1) * limit
+    err := query.Preload("Columns").
+        Preload("Members").
+        Preload("User").
+        Offset(offset).
+        Limit(limit).
+        Find(&boards).Error
+
+    return boards, int(total), err
+}
+```
+
+**Best Practices**
+1. Build query incrementally - start with base filters, add optional ones
+2. Always include required filters (like user_id) first
+3. Apply dynamic filters based on query parameters
+4. Count total after all filters are applied
+5. Apply offset and limit at the end
+
+### Query Parameter Handling in Fiber
+
+**Parsing Pagination Parameters**
+```go
+func (ctrl *BoardController) FindAll(c *fiber.Ctx) error {
+    userID := c.Locals("user_id").(string)
+
+    var req utils.PaginationRequest
+    c.QueryParser(&req)
+    utils.ValidatePagination(&req)
+
+    title := c.Query("title")
+
+    boards, total, err := ctrl.boardService.FindByUserIDWithFilters(c.Context(), userID, title, req.Page, req.Limit)
+    if err != nil {
+        return utils.Error(c, "Failed to find boards", fiber.StatusInternalServerError)
+    }
+
+    return utils.Success(c, utils.NewPaginatedResponse(toBoardResponseList(boards), req.Page, req.Limit, total))
+}
+```
+
+**Search Handler Pattern**
+```go
+func (ctrl *BoardController) Search(c *fiber.Ctx) error {
+    userID := c.Locals("user_id").(string)
+
+    var req utils.PaginationRequest
+    c.QueryParser(&req)
+    utils.ValidatePagination(&req)
+
+    keyword := c.Query("keyword")
+    if keyword == "" {
+        return utils.ValidationError(c, "keyword", "keyword is required")
+    }
+
+    boards, total, err := ctrl.boardService.Search(c.Context(), userID, keyword, req.Page, req.Limit)
+    if err != nil {
+        return utils.Error(c, "Failed to search boards", fiber.StatusInternalServerError)
+    }
+
+    return utils.Success(c, utils.NewPaginatedResponse(toBoardResponseList(boards), req.Page, req.Limit, total))
+}
+```
+
+### API Response Format
+
+**Paginated Response Structure**
+```json
+{
+  "success": true,
+  "data": {
+    "data": [
+      {
+        "id": "board-1",
+        "title": "Board 1",
+        ...
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 100,
+      "total_pages": 5
+    }
+  }
+}
+```
+
+### Endpoint Examples
+
+**Get Boards with Filtering**
+```
+GET /api/v1/boards?page=1&limit=20&title=project
+```
+
+**Search Boards**
+```
+GET /api/v1/boards/search?keyword=kanban&page=1&limit=20
+```
+
+**Get Tasks in Column with Filtering**
+```
+GET /api/v1/tasks/column/:columnId?page=1&limit=20&status=pending
+```
+
+**Search Tasks**
+```
+GET /api/v1/tasks/search?keyword=bug&board_id=board-123&page=1&limit=20
+```
+
+**Get Comments with Pagination**
+```
+GET /api/v1/comments/task/:taskId?page=1&limit=20
+```
+
+**Get Labels with Pagination**
+```
+GET /api/v1/labels?page=1&limit=20
+```
+
+**Search Labels**
+```
+GET /api/v1/labels/search?keyword=bug&page=1&limit=20
+```
+
+**Get Attachments with Pagination**
+```
+GET /api/v1/attachments/task/:taskId?page=1&limit=20
+```
+
+### Implementation Checklist
+
+**Repository Layer**
+- [x] Add pagination methods to all repositories
+- [x] Add search methods with ILIKE for text search
+- [x] Add filtering methods for common fields
+- [x] Return total count with data for pagination
+
+**Service Layer**
+- [x] Wrap repository methods with business logic
+- [x] Maintain authorization checks
+- [x] Handle pagination logic consistently
+
+**Controller Layer**
+- [x] Parse query parameters using Fiber's QueryParser
+- [x] Validate pagination parameters
+- [x] Use pagination helper for consistent responses
+- [x] Add search handlers for entities
+
+**Routes**
+- [x] Add search endpoints for Board, Task, Label
+- [x] Maintain existing endpoints with pagination support
+
+### Testing
+
+**Unit Tests Created**
+- Pagination helper tests (GetOffset, GetTotalPages, ValidatePagination, NewPaginatedResponse)
+- Controller mock updates for new methods
+
+**Test Considerations**
+- Mock pagination methods in service tests
+- Verify response format includes pagination metadata
+- Test edge cases (page=0, limit=0, limit>100)
+
+### Performance Considerations
+
+1. **Indexing**: Ensure columns used in WHERE clauses are indexed
+2. **ILIKE Performance**: Consider full-text search for large datasets
+3. **Count Queries**: Separate count queries can be expensive on large tables
+4. **Limit Enforcement**: Always enforce max limit (100 in this implementation)
+5. **Preload Optimization**: Only preload relations that are needed in the response
+
+### Database Compatibility
+
+**PostgreSQL**
+- Use ILIKE for case-insensitive search
+
+**MySQL**
+- Use LOWER(column) LIKE LOWER('%keyword%') for case-insensitive search
+
+**SQLite**
+- Use COLLATE NOCASE for case-insensitive comparison
+
+### Security Considerations
+
+1. Always validate pagination limits to prevent DoS
+2. Maintain authorization checks in service layer
+3. Sanitize search keywords to prevent SQL injection (GORM handles this)
+4. Don't expose sensitive data in pagination metadata
+
+### Future Enhancements
+
+1. Add sorting functionality (order by, sort direction)
+2. Implement cursor-based pagination for large datasets
+3. Add full-text search with ranking
+4. Support multiple filter operators (equals, contains, greater than, etc.)
+5. Add pagination caching for frequently accessed data
+

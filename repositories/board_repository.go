@@ -14,6 +14,8 @@ type BoardRepository interface {
 	Create(ctx context.Context, board *models.Board) error
 	FindByID(ctx context.Context, id string) (*models.Board, error)
 	FindByUserID(ctx context.Context, userID string) ([]*models.Board, error)
+	FindByUserIDWithFilters(ctx context.Context, userID string, title string, page, limit int) ([]*models.Board, int, error)
+	Search(ctx context.Context, userID string, keyword string, page, limit int) ([]*models.Board, int, error)
 	Update(ctx context.Context, board *models.Board) error
 	Delete(ctx context.Context, id string) error
 	SoftDelete(ctx context.Context, id string) error
@@ -85,4 +87,48 @@ func (r *boardRepository) SoftDelete(ctx context.Context, id string) error {
 		return fmt.Errorf("board with id %s not found", id)
 	}
 	return nil
+}
+
+func (r *boardRepository) FindByUserIDWithFilters(ctx context.Context, userID string, title string, page, limit int) ([]*models.Board, int, error) {
+	var boards []*models.Board
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&models.Board{}).Where("user_id = ?", userID)
+
+	if title != "" {
+		query = query.Where("title ILIKE ?", "%"+title+"%")
+	}
+
+	query.Count(&total)
+
+	offset := (page - 1) * limit
+	err := query.Preload("Columns").
+		Preload("Members").
+		Preload("User").
+		Offset(offset).
+		Limit(limit).
+		Find(&boards).Error
+
+	return boards, int(total), err
+}
+
+func (r *boardRepository) Search(ctx context.Context, userID string, keyword string, page, limit int) ([]*models.Board, int, error) {
+	var boards []*models.Board
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&models.Board{}).
+		Where("user_id = ?", userID).
+		Where("title ILIKE ? OR description ILIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+
+	query.Count(&total)
+
+	offset := (page - 1) * limit
+	err := query.Preload("Columns").
+		Preload("Members").
+		Preload("User").
+		Offset(offset).
+		Limit(limit).
+		Find(&boards).Error
+
+	return boards, int(total), err
 }

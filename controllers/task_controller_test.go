@@ -17,12 +17,14 @@ import (
 )
 
 type mockTaskService struct {
-	createFunc         func(ctx context.Context, userID, columnID, title, description string, deadline *time.Time) (*models.Task, error)
-	findByIDFunc       func(ctx context.Context, taskID, userID string) (*models.Task, error)
-	findByColumnIDFunc func(ctx context.Context, columnID, userID string) ([]*models.Task, error)
-	updateFunc         func(ctx context.Context, taskID, userID, title, description string, deadline *time.Time) (*models.Task, error)
-	deleteFunc         func(ctx context.Context, taskID, userID string) error
-	moveFunc           func(ctx context.Context, taskID, columnID, userID string) error
+	createFunc                    func(ctx context.Context, userID, columnID, title, description string, deadline *time.Time) (*models.Task, error)
+	findByIDFunc                  func(ctx context.Context, taskID, userID string) (*models.Task, error)
+	findByColumnIDFunc            func(ctx context.Context, columnID, userID string) ([]*models.Task, error)
+	findByColumnIDWithFiltersFunc func(ctx context.Context, columnID, userID string, title string, page, limit int) ([]*models.Task, int, error)
+	searchFunc                    func(ctx context.Context, boardID, userID string, keyword string, page, limit int) ([]*models.Task, int, error)
+	updateFunc                    func(ctx context.Context, taskID, userID, title, description string, deadline *time.Time) (*models.Task, error)
+	deleteFunc                    func(ctx context.Context, taskID, userID string) error
+	moveFunc                      func(ctx context.Context, taskID, columnID, userID string) error
 }
 
 func (m *mockTaskService) Create(ctx context.Context, userID, columnID, title, description string, deadline *time.Time) (*models.Task, error) {
@@ -109,6 +111,40 @@ func (m *mockTaskService) Move(ctx context.Context, taskID, columnID, userID str
 		return m.moveFunc(ctx, taskID, columnID, userID)
 	}
 	return nil
+}
+
+func (m *mockTaskService) FindByColumnIDWithFilters(ctx context.Context, columnID, userID string, title string, page, limit int) ([]*models.Task, int, error) {
+	if m.findByColumnIDWithFiltersFunc != nil {
+		return m.findByColumnIDWithFiltersFunc(ctx, columnID, userID, title, page, limit)
+	}
+	tasks := []*models.Task{
+		{
+			ID:          "task-1",
+			ColumnID:    columnID,
+			Title:       "Task 1",
+			Description: "Description 1",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		},
+	}
+	return tasks, 1, nil
+}
+
+func (m *mockTaskService) Search(ctx context.Context, boardID, userID string, keyword string, page, limit int) ([]*models.Task, int, error) {
+	if m.searchFunc != nil {
+		return m.searchFunc(ctx, boardID, userID, keyword, page, limit)
+	}
+	tasks := []*models.Task{
+		{
+			ID:          "task-1",
+			ColumnID:    "col-123",
+			Title:       "Test Task",
+			Description: "Test Description",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		},
+	}
+	return tasks, 1, nil
 }
 
 func TestNewTaskController(t *testing.T) {
@@ -348,7 +384,7 @@ func TestTaskController_FindByColumnID_Success(t *testing.T) {
 	app := fiber.New()
 
 	mockService := &mockTaskService{
-		findByColumnIDFunc: func(ctx context.Context, columnID, userID string) ([]*models.Task, error) {
+		findByColumnIDWithFiltersFunc: func(ctx context.Context, columnID, userID string, title string, page, limit int) ([]*models.Task, int, error) {
 			tasks := []*models.Task{
 				{
 					ID:          "task-1",
@@ -367,7 +403,7 @@ func TestTaskController_FindByColumnID_Success(t *testing.T) {
 					UpdatedAt:   time.Now(),
 				},
 			}
-			return tasks, nil
+			return tasks, 2, nil
 		},
 	}
 
@@ -392,14 +428,15 @@ func TestTaskController_FindByColumnID_Success(t *testing.T) {
 	assert.Contains(t, respBody, `"id":"task-2"`)
 	assert.Contains(t, respBody, `"title":"Task 1"`)
 	assert.Contains(t, respBody, `"title":"Task 2"`)
+	assert.Contains(t, respBody, `"pagination"`)
 }
 
 func TestTaskController_FindByColumnID_NotFound(t *testing.T) {
 	app := fiber.New()
 
 	mockService := &mockTaskService{
-		findByColumnIDFunc: func(ctx context.Context, columnID, userID string) ([]*models.Task, error) {
-			return nil, utils.NewNotFound("column not found")
+		findByColumnIDWithFiltersFunc: func(ctx context.Context, columnID, userID string, title string, page, limit int) ([]*models.Task, int, error) {
+			return nil, 0, utils.NewNotFound("column not found")
 		},
 	}
 
@@ -415,11 +452,12 @@ func TestTaskController_FindByColumnID_NotFound(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
 	respBody := string(body)
 
 	assert.Contains(t, respBody, `"success":false`)
-	assert.Contains(t, respBody, "column not found")
+	assert.Contains(t, respBody, `"message":"column not found"`)
 }
 
 func TestTaskController_Update_Success(t *testing.T) {

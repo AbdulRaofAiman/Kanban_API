@@ -118,12 +118,18 @@ func (ctrl *BoardController) FindByID(c *fiber.Ctx) error {
 func (ctrl *BoardController) FindAll(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
-	boards, err := ctrl.boardService.FindByUserID(c.Context(), userID)
+	var req utils.PaginationRequest
+	c.QueryParser(&req)
+	utils.ValidatePagination(&req)
+
+	title := c.Query("title")
+
+	boards, total, err := ctrl.boardService.FindByUserIDWithFilters(c.Context(), userID, title, req.Page, req.Limit)
 	if err != nil {
 		return utils.Error(c, "Failed to find boards", fiber.StatusInternalServerError)
 	}
 
-	return utils.Success(c, toBoardResponseList(boards))
+	return utils.Success(c, utils.NewPaginatedResponse(toBoardResponseList(boards), req.Page, req.Limit, total))
 }
 
 func (ctrl *BoardController) Update(c *fiber.Ctx) error {
@@ -179,4 +185,24 @@ func (ctrl *BoardController) Delete(c *fiber.Ctx) error {
 	return utils.Success(c, fiber.Map{
 		"message": "Board deleted successfully",
 	})
+}
+
+func (ctrl *BoardController) Search(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+
+	var req utils.PaginationRequest
+	c.QueryParser(&req)
+	utils.ValidatePagination(&req)
+
+	keyword := c.Query("keyword")
+	if keyword == "" {
+		return utils.ValidationError(c, "keyword", "keyword is required")
+	}
+
+	boards, total, err := ctrl.boardService.Search(c.Context(), userID, keyword, req.Page, req.Limit)
+	if err != nil {
+		return utils.Error(c, "Failed to search boards", fiber.StatusInternalServerError)
+	}
+
+	return utils.Success(c, utils.NewPaginatedResponse(toBoardResponseList(boards), req.Page, req.Limit, total))
 }

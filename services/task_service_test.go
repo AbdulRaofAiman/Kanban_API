@@ -83,6 +83,40 @@ func (m *mockTaskRepository) SoftDelete(ctx context.Context, id string) error {
 	return m.Delete(ctx, id)
 }
 
+func (m *mockTaskRepository) FindByColumnIDWithFilters(ctx context.Context, columnID string, title string, page, limit int) ([]*models.Task, int, error) {
+	var tasks []*models.Task
+	for _, task := range m.tasks {
+		if task.ColumnID == columnID && (title == "" || task.Title == title) {
+			tasks = append(tasks, task)
+		}
+	}
+	offset := (page - 1) * limit
+	if offset >= len(tasks) {
+		return []*models.Task{}, 0, nil
+	}
+	if offset+limit > len(tasks) {
+		return tasks[offset:], len(tasks), nil
+	}
+	return tasks[offset : offset+limit], len(tasks), nil
+}
+
+func (m *mockTaskRepository) Search(ctx context.Context, boardID string, keyword string, page, limit int) ([]*models.Task, int, error) {
+	var tasks []*models.Task
+	for _, task := range m.tasks {
+		if task.Title == keyword {
+			tasks = append(tasks, task)
+		}
+	}
+	offset := (page - 1) * limit
+	if offset >= len(tasks) {
+		return []*models.Task{}, 0, nil
+	}
+	if offset+limit > len(tasks) {
+		return tasks[offset:], len(tasks), nil
+	}
+	return tasks[offset : offset+limit], len(tasks), nil
+}
+
 func setupTestColumn(boardID string) *models.Column {
 	return &models.Column{
 		ID:      generateColumnTestID(),

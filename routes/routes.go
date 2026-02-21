@@ -26,6 +26,7 @@ func Setup(app *fiber.App, authService services.AuthService, authController *con
 	boards.Post("/", boardController.Create)
 	boards.Get("/:id", boardController.FindByID)
 	boards.Get("/", boardController.FindAll)
+	boards.Get("/search", boardController.Search)
 	boards.Put("/:id", boardController.Update)
 	boards.Delete("/:id", boardController.Delete)
 
@@ -34,6 +35,7 @@ func Setup(app *fiber.App, authService services.AuthService, authController *con
 	tasks.Post("/", taskController.Create)
 	tasks.Get("/:id", taskController.FindByID)
 	tasks.Get("/column/:columnId", taskController.FindByColumnID)
+	tasks.Get("/search", taskController.Search)
 	tasks.Put("/:id", taskController.Update)
 	tasks.Delete("/:id", taskController.Delete)
 	tasks.Put("/:id/move", taskController.Move)
@@ -52,6 +54,7 @@ func Setup(app *fiber.App, authService services.AuthService, authController *con
 	labels.Use(middleware.AuthMiddleware(authService))
 	labels.Post("/", labelController.Create)
 	labels.Get("/", labelController.FindAll)
+	labels.Get("/search", labelController.Search)
 	labels.Get("/:id", labelController.FindByID)
 	labels.Put("/:id", labelController.Update)
 	labels.Delete("/:id", labelController.Delete)

@@ -68,6 +68,22 @@ func (m *mockLabelRepository) SoftDelete(ctx context.Context, id string) error {
 	return m.Delete(ctx, id)
 }
 
+func (m *mockLabelRepository) FindAllWithPagination(ctx context.Context, page, limit int) ([]*models.Label, int, error) {
+	var labels []*models.Label
+	for _, label := range m.labels {
+		labels = append(labels, label)
+	}
+	return labels, len(labels), nil
+}
+
+func (m *mockLabelRepository) Search(ctx context.Context, keyword string, page, limit int) ([]*models.Label, int, error) {
+	var labels []*models.Label
+	for _, label := range m.labels {
+		labels = append(labels, label)
+	}
+	return labels, len(labels), nil
+}
+
 type mockTaskRepositoryForLabel struct {
 	tasks map[string]*models.Task
 }
@@ -110,6 +126,14 @@ func (m *mockTaskRepositoryForLabel) Delete(ctx context.Context, id string) erro
 
 func (m *mockTaskRepositoryForLabel) SoftDelete(ctx context.Context, id string) error {
 	return nil
+}
+
+func (m *mockTaskRepositoryForLabel) FindByColumnIDWithFilters(ctx context.Context, columnID string, title string, offset, limit int) ([]*models.Task, int, error) {
+	return nil, 0, nil
+}
+
+func (m *mockTaskRepositoryForLabel) Search(ctx context.Context, boardID string, keyword string, offset, limit int) ([]*models.Task, int, error) {
+	return nil, 0, nil
 }
 
 func TestNewLabelService(t *testing.T) {

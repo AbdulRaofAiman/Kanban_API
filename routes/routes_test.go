@@ -77,6 +77,21 @@ func (m *MockBoardService) Delete(ctx context.Context, boardID, userID string) e
 	return utils.NewNotFound("board not found")
 }
 
+func (m *MockBoardService) FindByUserIDWithFilters(ctx context.Context, userID, title string, offset, limit int) ([]*models.Board, int, error) {
+	boards := []*models.Board{
+		{ID: "board-1", Title: "Test Board", UserID: userID},
+		{ID: "board-2", Title: "Another Board", UserID: userID},
+	}
+	return boards, len(boards), nil
+}
+
+func (m *MockBoardService) Search(ctx context.Context, userID, keyword string, offset, limit int) ([]*models.Board, int, error) {
+	boards := []*models.Board{
+		{ID: "board-1", Title: "Test Board", UserID: userID},
+	}
+	return boards, len(boards), nil
+}
+
 type MockTaskService struct{}
 
 func (m *MockTaskService) Create(ctx context.Context, userID, columnID, title, description string, deadline *time.Time) (*models.Task, error) {
@@ -120,6 +135,21 @@ func (m *MockTaskService) Move(ctx context.Context, taskID, columnID, userID str
 	return utils.NewNotFound("task not found")
 }
 
+func (m *MockTaskService) FindByColumnIDWithFilters(ctx context.Context, columnID, title, status string, offset, limit int) ([]*models.Task, int, error) {
+	tasks := []*models.Task{
+		{ID: "task-1", ColumnID: columnID, Title: "Test Task"},
+		{ID: "task-2", ColumnID: columnID, Title: "Another Task"},
+	}
+	return tasks, len(tasks), nil
+}
+
+func (m *MockTaskService) Search(ctx context.Context, boardID, userID string, keyword string, offset, limit int) ([]*models.Task, int, error) {
+	tasks := []*models.Task{
+		{ID: "task-1", Title: "Test Task"},
+	}
+	return tasks, len(tasks), nil
+}
+
 type MockCommentService struct{}
 
 func (m *MockCommentService) Create(ctx context.Context, taskID, userID, content string) (*models.Comment, error) {
@@ -140,6 +170,14 @@ func (m *MockCommentService) FindByTaskID(ctx context.Context, taskID, userID st
 		}, nil
 	}
 	return nil, utils.NewNotFound("task not found")
+}
+
+func (m *MockCommentService) FindByTaskIDWithPagination(ctx context.Context, taskID, userID string, offset, limit int) ([]*models.Comment, int, error) {
+	comments := []*models.Comment{
+		{ID: "comment-1", TaskID: taskID, Content: "Test Comment"},
+		{ID: "comment-2", TaskID: taskID, Content: "Another Comment"},
+	}
+	return comments, len(comments), nil
 }
 
 func (m *MockCommentService) Update(ctx context.Context, id, userID, content string) (*models.Comment, error) {
@@ -204,6 +242,21 @@ func (m *MockLabelService) RemoveFromTask(ctx context.Context, taskID, labelID, 
 	return utils.NewNotFound("task or label not found")
 }
 
+func (m *MockLabelService) FindAllWithPagination(ctx context.Context, offset, limit int) ([]*models.Label, int, error) {
+	labels := []*models.Label{
+		{ID: "label-1", Name: "Bug", Color: "#FF0000"},
+		{ID: "label-2", Name: "Feature", Color: "#00FF00"},
+	}
+	return labels, len(labels), nil
+}
+
+func (m *MockLabelService) Search(ctx context.Context, keyword string, offset, limit int) ([]*models.Label, int, error) {
+	labels := []*models.Label{
+		{ID: "label-1", Name: "Bug", Color: "#FF0000"},
+	}
+	return labels, len(labels), nil
+}
+
 type MockAttachmentService struct{}
 
 func (m *MockAttachmentService) Create(ctx context.Context, taskID, userID, fileName, fileURL string, fileSize int64) (*models.Attachment, error) {
@@ -224,6 +277,14 @@ func (m *MockAttachmentService) FindByTaskID(ctx context.Context, taskID, userID
 		}, nil
 	}
 	return nil, utils.NewNotFound("task not found")
+}
+
+func (m *MockAttachmentService) FindByTaskIDWithPagination(ctx context.Context, taskID, userID string, offset, limit int) ([]*models.Attachment, int, error) {
+	attachments := []*models.Attachment{
+		{ID: "attachment-1", TaskID: taskID, FileName: "file.pdf", FileURL: "https://example.com/file.pdf"},
+		{ID: "attachment-2", TaskID: taskID, FileName: "file2.pdf", FileURL: "https://example.com/file2.pdf"},
+	}
+	return attachments, len(attachments), nil
 }
 
 func (m *MockAttachmentService) Update(ctx context.Context, id, userID, fileName, fileURL string, fileSize int64) (*models.Attachment, error) {

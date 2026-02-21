@@ -14,11 +14,12 @@ import (
 )
 
 type mockCommentService struct {
-	createFunc       func(ctx context.Context, taskID, userID, content string) (*models.Comment, error)
-	findByIDFunc     func(ctx context.Context, id, userID string) (*models.Comment, error)
-	findByTaskIDFunc func(ctx context.Context, taskID, userID string) ([]*models.Comment, error)
-	updateFunc       func(ctx context.Context, id, userID, content string) (*models.Comment, error)
-	deleteFunc       func(ctx context.Context, id, userID string) error
+	createFunc                     func(ctx context.Context, taskID, userID, content string) (*models.Comment, error)
+	findByIDFunc                   func(ctx context.Context, id, userID string) (*models.Comment, error)
+	findByTaskIDFunc               func(ctx context.Context, taskID, userID string) ([]*models.Comment, error)
+	findByTaskIDWithPaginationFunc func(ctx context.Context, taskID, userID string, page, limit int) ([]*models.Comment, int, error)
+	updateFunc                     func(ctx context.Context, id, userID, content string) (*models.Comment, error)
+	deleteFunc                     func(ctx context.Context, id, userID string) error
 }
 
 func (m *mockCommentService) Create(ctx context.Context, taskID, userID, content string) (*models.Comment, error) {
@@ -68,6 +69,15 @@ func (m *mockCommentService) Delete(ctx context.Context, id, userID string) erro
 		return m.deleteFunc(ctx, id, userID)
 	}
 	return nil
+}
+
+func (m *mockCommentService) FindByTaskIDWithPagination(ctx context.Context, taskID, userID string, page, limit int) ([]*models.Comment, int, error) {
+	if m.findByTaskIDWithPaginationFunc != nil {
+		return m.findByTaskIDWithPaginationFunc(ctx, taskID, userID, page, limit)
+	}
+	return []*models.Comment{
+		{ID: "comment-1", TaskID: taskID, Content: "Comment 1"},
+	}, 1, nil
 }
 
 func TestNewCommentController(t *testing.T) {

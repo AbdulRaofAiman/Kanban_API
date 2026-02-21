@@ -120,7 +120,11 @@ func (ctrl *CommentController) FindByTaskID(c *fiber.Ctx) error {
 		return utils.ValidationError(c, "task_id", "task id is required")
 	}
 
-	comments, err := ctrl.commentService.FindByTaskID(c.Context(), taskID, userID)
+	var req utils.PaginationRequest
+	c.QueryParser(&req)
+	utils.ValidatePagination(&req)
+
+	comments, total, err := ctrl.commentService.FindByTaskIDWithPagination(c.Context(), taskID, userID, req.Page, req.Limit)
 	if err != nil {
 		var notFoundErr utils.ErrNotFound
 		if errors.As(err, &notFoundErr) {
@@ -133,7 +137,7 @@ func (ctrl *CommentController) FindByTaskID(c *fiber.Ctx) error {
 		return utils.Error(c, "Failed to find comments", fiber.StatusInternalServerError)
 	}
 
-	return utils.Success(c, toCommentResponseList(comments))
+	return utils.Success(c, utils.NewPaginatedResponse(toCommentResponseList(comments), req.Page, req.Limit, total))
 }
 
 func (ctrl *CommentController) Update(c *fiber.Ctx) error {

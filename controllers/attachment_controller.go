@@ -128,7 +128,11 @@ func (ctrl *AttachmentController) FindByTaskID(c *fiber.Ctx) error {
 		return utils.ValidationError(c, "task_id", "task id is required")
 	}
 
-	attachments, err := ctrl.attachmentService.FindByTaskID(c.Context(), taskID, userID)
+	var req utils.PaginationRequest
+	c.QueryParser(&req)
+	utils.ValidatePagination(&req)
+
+	attachments, total, err := ctrl.attachmentService.FindByTaskIDWithPagination(c.Context(), taskID, userID, req.Page, req.Limit)
 	if err != nil {
 		var notFoundErr utils.ErrNotFound
 		if errors.As(err, &notFoundErr) {
@@ -141,7 +145,7 @@ func (ctrl *AttachmentController) FindByTaskID(c *fiber.Ctx) error {
 		return utils.Error(c, "Failed to find attachments", fiber.StatusInternalServerError)
 	}
 
-	return utils.Success(c, toAttachmentResponseList(attachments))
+	return utils.Success(c, utils.NewPaginatedResponse(toAttachmentResponseList(attachments), req.Page, req.Limit, total))
 }
 
 func (ctrl *AttachmentController) Update(c *fiber.Ctx) error {

@@ -17,11 +17,13 @@ import (
 )
 
 type mockBoardService struct {
-	createFunc       func(ctx context.Context, userID, title, color string) (*models.Board, error)
-	findByIDFunc     func(ctx context.Context, boardID, userID string) (*models.Board, error)
-	findByUserIDFunc func(ctx context.Context, userID string) ([]*models.Board, error)
-	updateFunc       func(ctx context.Context, boardID, userID, title, color string) (*models.Board, error)
-	deleteFunc       func(ctx context.Context, boardID, userID string) error
+	createFunc                  func(ctx context.Context, userID, title, color string) (*models.Board, error)
+	findByIDFunc                func(ctx context.Context, boardID, userID string) (*models.Board, error)
+	findByUserIDFunc            func(ctx context.Context, userID string) ([]*models.Board, error)
+	findByUserIDWithFiltersFunc func(ctx context.Context, userID string, title string, page, limit int) ([]*models.Board, int, error)
+	searchFunc                  func(ctx context.Context, userID string, keyword string, page, limit int) ([]*models.Board, int, error)
+	updateFunc                  func(ctx context.Context, boardID, userID, title, color string) (*models.Board, error)
+	deleteFunc                  func(ctx context.Context, boardID, userID string) error
 }
 
 func (m *mockBoardService) Create(ctx context.Context, userID, title, color string) (*models.Board, error) {
@@ -110,6 +112,42 @@ func (m *mockBoardService) Delete(ctx context.Context, boardID, userID string) e
 		return m.deleteFunc(ctx, boardID, userID)
 	}
 	return nil
+}
+
+func (m *mockBoardService) FindByUserIDWithFilters(ctx context.Context, userID string, title string, page, limit int) ([]*models.Board, int, error) {
+	if m.findByUserIDWithFiltersFunc != nil {
+		return m.findByUserIDWithFiltersFunc(ctx, userID, title, page, limit)
+	}
+	boards := []*models.Board{
+		{
+			ID:        "board-1",
+			Title:     "Board 1",
+			UserID:    userID,
+			Color:     "#000000",
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			Columns:   []models.Column{},
+		},
+	}
+	return boards, 1, nil
+}
+
+func (m *mockBoardService) Search(ctx context.Context, userID string, keyword string, page, limit int) ([]*models.Board, int, error) {
+	if m.searchFunc != nil {
+		return m.searchFunc(ctx, userID, keyword, page, limit)
+	}
+	boards := []*models.Board{
+		{
+			ID:        "board-1",
+			Title:     "Test Board",
+			UserID:    userID,
+			Color:     "#000000",
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			Columns:   []models.Column{},
+		},
+	}
+	return boards, 1, nil
 }
 
 func TestNewBoardController(t *testing.T) {
@@ -357,7 +395,7 @@ func TestBoardController_FindAll_Success(t *testing.T) {
 	app := fiber.New()
 
 	mockService := &mockBoardService{
-		findByUserIDFunc: func(ctx context.Context, userID string) ([]*models.Board, error) {
+		findByUserIDWithFiltersFunc: func(ctx context.Context, userID string, title string, page, limit int) ([]*models.Board, int, error) {
 			boards := []*models.Board{
 				{
 					ID:        "board-1",
@@ -378,7 +416,7 @@ func TestBoardController_FindAll_Success(t *testing.T) {
 					Columns:   []models.Column{},
 				},
 			}
-			return boards, nil
+			return boards, 2, nil
 		},
 	}
 
@@ -403,6 +441,7 @@ func TestBoardController_FindAll_Success(t *testing.T) {
 	assert.Contains(t, respBody, `"id":"board-2"`)
 	assert.Contains(t, respBody, `"title":"Board 1"`)
 	assert.Contains(t, respBody, `"title":"Board 2"`)
+	assert.Contains(t, respBody, `"pagination"`)
 }
 
 func TestBoardController_Update_Success(t *testing.T) {

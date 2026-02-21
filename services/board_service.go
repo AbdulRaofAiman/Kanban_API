@@ -12,6 +12,8 @@ type BoardService interface {
 	Create(ctx context.Context, userID, title, color string) (*models.Board, error)
 	FindByID(ctx context.Context, boardID, userID string) (*models.Board, error)
 	FindByUserID(ctx context.Context, userID string) ([]*models.Board, error)
+	FindByUserIDWithFilters(ctx context.Context, userID string, title string, page, limit int) ([]*models.Board, int, error)
+	Search(ctx context.Context, userID string, keyword string, page, limit int) ([]*models.Board, int, error)
 	Update(ctx context.Context, boardID, userID, title, color string) (*models.Board, error)
 	Delete(ctx context.Context, boardID, userID string) error
 }
@@ -114,4 +116,22 @@ func (s *boardService) Delete(ctx context.Context, boardID, userID string) error
 	}
 
 	return nil
+}
+
+func (s *boardService) FindByUserIDWithFilters(ctx context.Context, userID string, title string, page, limit int) ([]*models.Board, int, error) {
+	boards, total, err := s.boardRepo.FindByUserIDWithFilters(ctx, userID, title, page, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return boards, total, nil
+}
+
+func (s *boardService) Search(ctx context.Context, userID string, keyword string, page, limit int) ([]*models.Board, int, error) {
+	boards, total, err := s.boardRepo.Search(ctx, userID, keyword, page, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return boards, total, nil
 }

@@ -14,11 +14,12 @@ import (
 )
 
 type mockAttachmentService struct {
-	createFunc       func(ctx context.Context, taskID, userID, fileName, fileURL string, fileSize int64) (*models.Attachment, error)
-	findByIDFunc     func(ctx context.Context, id, userID string) (*models.Attachment, error)
-	findByTaskIDFunc func(ctx context.Context, taskID, userID string) ([]*models.Attachment, error)
-	updateFunc       func(ctx context.Context, id, userID, fileName, fileURL string, fileSize int64) (*models.Attachment, error)
-	deleteFunc       func(ctx context.Context, id, userID string) error
+	createFunc                     func(ctx context.Context, taskID, userID, fileName, fileURL string, fileSize int64) (*models.Attachment, error)
+	findByIDFunc                   func(ctx context.Context, id, userID string) (*models.Attachment, error)
+	findByTaskIDFunc               func(ctx context.Context, taskID, userID string) ([]*models.Attachment, error)
+	findByTaskIDWithPaginationFunc func(ctx context.Context, taskID, userID string, page, limit int) ([]*models.Attachment, int, error)
+	updateFunc                     func(ctx context.Context, id, userID, fileName, fileURL string, fileSize int64) (*models.Attachment, error)
+	deleteFunc                     func(ctx context.Context, id, userID string) error
 }
 
 func (m *mockAttachmentService) Create(ctx context.Context, taskID, userID, fileName, fileURL string, fileSize int64) (*models.Attachment, error) {
@@ -73,6 +74,15 @@ func (m *mockAttachmentService) Delete(ctx context.Context, id, userID string) e
 		return m.deleteFunc(ctx, id, userID)
 	}
 	return nil
+}
+
+func (m *mockAttachmentService) FindByTaskIDWithPagination(ctx context.Context, taskID, userID string, page, limit int) ([]*models.Attachment, int, error) {
+	if m.findByTaskIDWithPaginationFunc != nil {
+		return m.findByTaskIDWithPaginationFunc(ctx, taskID, userID, page, limit)
+	}
+	return []*models.Attachment{
+		{ID: "attachment-1", TaskID: taskID, FileName: "file1.pdf", FileURL: "https://example.com/file1.pdf"},
+	}, 1, nil
 }
 
 func TestNewAttachmentController(t *testing.T) {

@@ -104,12 +104,16 @@ func (ctrl *LabelController) FindByID(c *fiber.Ctx) error {
 }
 
 func (ctrl *LabelController) FindAll(c *fiber.Ctx) error {
-	labels, err := ctrl.labelService.FindAll(c.Context())
+	var req utils.PaginationRequest
+	c.QueryParser(&req)
+	utils.ValidatePagination(&req)
+
+	labels, total, err := ctrl.labelService.FindAllWithPagination(c.Context(), req.Page, req.Limit)
 	if err != nil {
 		return utils.Error(c, "Failed to find labels", fiber.StatusInternalServerError)
 	}
 
-	return utils.Success(c, toLabelResponseList(labels))
+	return utils.Success(c, utils.NewPaginatedResponse(toLabelResponseList(labels), req.Page, req.Limit, total))
 }
 
 func (ctrl *LabelController) Update(c *fiber.Ctx) error {
@@ -217,4 +221,22 @@ func (ctrl *LabelController) RemoveFromTask(c *fiber.Ctx) error {
 	return utils.Success(c, fiber.Map{
 		"message": "Label removed from task successfully",
 	})
+}
+
+func (ctrl *LabelController) Search(c *fiber.Ctx) error {
+	var req utils.PaginationRequest
+	c.QueryParser(&req)
+	utils.ValidatePagination(&req)
+
+	keyword := c.Query("keyword")
+	if keyword == "" {
+		return utils.ValidationError(c, "keyword", "keyword is required")
+	}
+
+	labels, total, err := ctrl.labelService.Search(c.Context(), keyword, req.Page, req.Limit)
+	if err != nil {
+		return utils.Error(c, "Failed to search labels", fiber.StatusInternalServerError)
+	}
+
+	return utils.Success(c, utils.NewPaginatedResponse(toLabelResponseList(labels), req.Page, req.Limit, total))
 }
