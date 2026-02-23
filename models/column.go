@@ -12,7 +12,7 @@ type Column struct {
 	ID        string         `gorm:"primaryKey;type:varchar(36)" json:"id"`
 	BoardID   string         `gorm:"not null;type:varchar(36);index:column_board" json:"board_id"`
 	Title     string         `gorm:"not null;type:varchar(255)" json:"title"`
-	Order     int            `gorm:"not null" json:"order"`
+	OrderNum  int            `gorm:"not null;column:order_num" json:"order"`
 	CreatedAt time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
@@ -32,5 +32,10 @@ func (c *Column) BeforeCreate(tx *gorm.DB) error {
 	if c.ID == "" {
 		c.ID = uuid.New().String()
 	}
+
+	if c.OrderNum == 0 {
+		c.OrderNum = 1
+	}
+
 	return nil
 }

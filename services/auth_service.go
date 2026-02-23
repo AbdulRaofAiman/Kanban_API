@@ -14,6 +14,7 @@ type AuthService interface {
 	Login(ctx context.Context, email, password string) (string, error)
 	GenerateToken(userID string, expiry time.Duration) (string, error)
 	ValidateToken(tokenString string) (string, error)
+	GetUserByID(ctx context.Context, userID string) (*models.User, error)
 	HashPassword(password string) (string, error)
 	VerifyPassword(hashedPassword, password string) error
 }
@@ -81,6 +82,14 @@ func (s *authService) ValidateToken(tokenString string) (string, error) {
 		return "", utils.NewUnauthorized("invalid or expired token")
 	}
 	return claims.UserID, nil
+}
+
+func (s *authService) GetUserByID(ctx context.Context, userID string) (*models.User, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, utils.NewNotFound("user not found")
+	}
+	return user, nil
 }
 
 func (s *authService) HashPassword(password string) (string, error) {

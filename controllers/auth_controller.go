@@ -133,6 +133,33 @@ func (ctrl *AuthController) Login(c *fiber.Ctx) error {
 	})
 }
 
+func (ctrl *AuthController) Me(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+
+	user, err := ctrl.authService.GetUserByID(c.Context(), userID)
+	if err != nil {
+		var notFoundErr utils.ErrNotFound
+		if errors.As(err, &notFoundErr) {
+			return utils.Error(c, err.Error(), fiber.StatusNotFound)
+		}
+		return utils.Error(c, "Failed to get user", fiber.StatusInternalServerError)
+	}
+
+	return utils.Success(c, UserResponse{
+		ID:        user.ID,
+		Username:  user.Username,
+		Email:     user.Email,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	})
+}
+
+func (ctrl *AuthController) Logout(c *fiber.Ctx) error {
+	return utils.Success(c, fiber.Map{
+		"message": "Logged out successfully",
+	})
+}
+
 func isValidEmail(email string) bool {
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	return emailRegex.MatchString(email)

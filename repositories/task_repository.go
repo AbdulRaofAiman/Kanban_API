@@ -41,7 +41,7 @@ func (r *taskRepository) FindByID(ctx context.Context, id string) (*models.Task,
 		Preload("Comments").
 		Preload("Labels").
 		Preload("Attachments").
-		Preload("Column").
+		Preload("Column.Board").
 		Where("id = ?", id).
 		First(&task).Error
 	if err != nil {
@@ -56,7 +56,7 @@ func (r *taskRepository) FindByColumnID(ctx context.Context, columnID string) ([
 		Preload("Comments").
 		Preload("Labels").
 		Preload("Attachments").
-		Preload("Column").
+		Preload("Column.Board").
 		Where("column_id = ?", columnID).
 		Find(&tasks).Error
 	if err != nil {
@@ -107,7 +107,7 @@ func (r *taskRepository) FindByColumnIDWithFilters(ctx context.Context, columnID
 	err := query.Preload("Comments").
 		Preload("Labels").
 		Preload("Attachments").
-		Preload("Column").
+		Preload("Column.Board").
 		Offset(offset).
 		Limit(limit).
 		Find(&tasks).Error
@@ -131,7 +131,7 @@ func (r *taskRepository) Search(ctx context.Context, boardID string, keyword str
 	err := query.Preload("Comments").
 		Preload("Labels").
 		Preload("Attachments").
-		Preload("Column").
+		Preload("Column.Board").
 		Offset(offset).
 		Limit(limit).
 		Find(&tasks).Error

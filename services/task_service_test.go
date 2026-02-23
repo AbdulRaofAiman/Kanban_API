@@ -119,10 +119,10 @@ func (m *mockTaskRepository) Search(ctx context.Context, boardID string, keyword
 
 func setupTestColumn(boardID string) *models.Column {
 	return &models.Column{
-		ID:      generateColumnTestID(),
-		BoardID: boardID,
-		Title:   "Test Column",
-		Order:   1,
+		ID:       generateColumnTestID(),
+		BoardID:  boardID,
+		Title:    "Test Column",
+		OrderNum: 1,
 		Board: &models.Board{
 			ID:     boardID,
 			UserID: "user123",
@@ -861,11 +861,11 @@ func TestTaskService_Integration(t *testing.T) {
 	}
 
 	column1 := &models.Column{
-		ID:      generateColumnTestID(),
-		BoardID: board.ID,
-		Title:   "To Do",
-		Order:   1,
-		Board:   board,
+		ID:       generateColumnTestID(),
+		BoardID:  board.ID,
+		Title:    "To Do",
+		OrderNum: 1,
+		Board:    board,
 	}
 	err := mockColumnRepo.Create(ctx, column1)
 	if err != nil {
@@ -873,11 +873,11 @@ func TestTaskService_Integration(t *testing.T) {
 	}
 
 	column2 := &models.Column{
-		ID:      generateColumnTestID(),
-		BoardID: board.ID,
-		Title:   "In Progress",
-		Order:   2,
-		Board:   board,
+		ID:       generateColumnTestID(),
+		BoardID:  board.ID,
+		Title:    "In Progress",
+		OrderNum: 2,
+		Board:    board,
 	}
 	err = mockColumnRepo.Create(ctx, column2)
 	if err != nil {

@@ -38,9 +38,9 @@ func (m *mockBoardService) Create(ctx context.Context, userID, title, color stri
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 		Columns: []models.Column{
-			{ID: "col-1", Title: "To Do", Order: 1, BoardID: "board-123"},
-			{ID: "col-2", Title: "In Progress", Order: 2, BoardID: "board-123"},
-			{ID: "col-3", Title: "Done", Order: 3, BoardID: "board-123"},
+			{ID: "col-1", Title: "To Do", OrderNum: 1, BoardID: "board-123"},
+			{ID: "col-2", Title: "In Progress", OrderNum: 2, BoardID: "board-123"},
+			{ID: "col-3", Title: "Done", OrderNum: 3, BoardID: "board-123"},
 		},
 	}
 	return board, nil
@@ -58,7 +58,7 @@ func (m *mockBoardService) FindByID(ctx context.Context, boardID, userID string)
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 		Columns: []models.Column{
-			{ID: "col-1", Title: "To Do", Order: 1, BoardID: boardID},
+			{ID: "col-1", Title: "To Do", OrderNum: 1, BoardID: boardID},
 		},
 	}
 	return board, nil
@@ -171,9 +171,9 @@ func TestBoardController_Create_Success(t *testing.T) {
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
 				Columns: []models.Column{
-					{ID: "col-1", Title: "To Do", Order: 1, BoardID: "board-123"},
-					{ID: "col-2", Title: "In Progress", Order: 2, BoardID: "board-123"},
-					{ID: "col-3", Title: "Done", Order: 3, BoardID: "board-123"},
+					{ID: "col-1", Title: "To Do", OrderNum: 1, BoardID: "board-123"},
+					{ID: "col-2", Title: "In Progress", OrderNum: 2, BoardID: "board-123"},
+					{ID: "col-3", Title: "Done", OrderNum: 3, BoardID: "board-123"},
 				},
 			}
 			return board, nil
@@ -307,7 +307,7 @@ func TestBoardController_FindByID_Success(t *testing.T) {
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
 				Columns: []models.Column{
-					{ID: "col-1", Title: "To Do", Order: 1, BoardID: boardID},
+					{ID: "col-1", Title: "To Do", OrderNum: 1, BoardID: boardID},
 				},
 			}
 			return board, nil

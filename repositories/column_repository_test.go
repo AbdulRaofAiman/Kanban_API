@@ -26,9 +26,9 @@ func TestColumnRepository_Create(t *testing.T) {
 		{
 			name: "Valid column",
 			column: &models.Column{
-				BoardID: board.ID,
-				Title:   "To Do",
-				Order:   1,
+				BoardID:  board.ID,
+				Title:    "To Do",
+				OrderNum: 1,
 			},
 			wantError: false,
 		},
@@ -45,7 +45,7 @@ func TestColumnRepository_Create(t *testing.T) {
 				assert.NotEmpty(t, tc.column.ID)
 				assert.Equal(t, "To Do", tc.column.Title)
 				assert.Equal(t, board.ID, tc.column.BoardID)
-				assert.Equal(t, 1, tc.column.Order)
+				assert.Equal(t, 1, tc.column.OrderNum)
 			}
 		})
 	}
@@ -60,9 +60,9 @@ func TestColumnRepository_FindByID(t *testing.T) {
 	board := createTestBoard(db, user.ID)
 
 	testColumn := &models.Column{
-		BoardID: board.ID,
-		Title:   "To Do",
-		Order:   1,
+		BoardID:  board.ID,
+		Title:    "To Do",
+		OrderNum: 1,
 	}
 	err := repo.Create(ctx, testColumn)
 	require.NoError(t, err)
@@ -113,19 +113,19 @@ func TestColumnRepository_FindByBoardID(t *testing.T) {
 	board2 := createTestBoard(db, user.ID)
 
 	column1 := &models.Column{
-		BoardID: board1.ID,
-		Title:   "To Do",
-		Order:   1,
+		BoardID:  board1.ID,
+		Title:    "To Do",
+		OrderNum: 1,
 	}
 	column2 := &models.Column{
-		BoardID: board1.ID,
-		Title:   "In Progress",
-		Order:   2,
+		BoardID:  board1.ID,
+		Title:    "In Progress",
+		OrderNum: 2,
 	}
 	column3 := &models.Column{
-		BoardID: board2.ID,
-		Title:   "Done",
-		Order:   3,
+		BoardID:  board2.ID,
+		Title:    "Done",
+		OrderNum: 3,
 	}
 
 	err := repo.Create(ctx, column1)
@@ -196,22 +196,22 @@ func TestColumnRepository_Update(t *testing.T) {
 	board := createTestBoard(db, user.ID)
 
 	testColumn := &models.Column{
-		BoardID: board.ID,
-		Title:   "To Do",
-		Order:   1,
+		BoardID:  board.ID,
+		Title:    "To Do",
+		OrderNum: 1,
 	}
 	err := repo.Create(ctx, testColumn)
 	require.NoError(t, err)
 
 	testColumn.Title = "In Progress"
-	testColumn.Order = 2
+	testColumn.OrderNum = 2
 	err = repo.Update(ctx, testColumn)
 	assert.NoError(t, err)
 
 	updatedColumn, err := repo.FindByID(ctx, testColumn.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, "In Progress", updatedColumn.Title)
-	assert.Equal(t, 2, updatedColumn.Order)
+	assert.Equal(t, 2, updatedColumn.OrderNum)
 }
 
 func TestColumnRepository_Delete(t *testing.T) {
@@ -223,9 +223,9 @@ func TestColumnRepository_Delete(t *testing.T) {
 	board := createTestBoard(db, user.ID)
 
 	testColumn := &models.Column{
-		BoardID: board.ID,
-		Title:   "To Do",
-		Order:   1,
+		BoardID:  board.ID,
+		Title:    "To Do",
+		OrderNum: 1,
 	}
 	err := repo.Create(ctx, testColumn)
 	require.NoError(t, err)
@@ -269,9 +269,9 @@ func TestColumnRepository_SoftDelete(t *testing.T) {
 	board := createTestBoard(db, user.ID)
 
 	testColumn := &models.Column{
-		BoardID: board.ID,
-		Title:   "To Do",
-		Order:   1,
+		BoardID:  board.ID,
+		Title:    "To Do",
+		OrderNum: 1,
 	}
 	err := repo.Create(ctx, testColumn)
 	require.NoError(t, err)
@@ -320,9 +320,9 @@ func TestColumnRepository_Preloading(t *testing.T) {
 	board := createTestBoard(db, user.ID)
 
 	column := &models.Column{
-		BoardID: board.ID,
-		Title:   "To Do",
-		Order:   1,
+		BoardID:  board.ID,
+		Title:    "To Do",
+		OrderNum: 1,
 	}
 	err := repo.Create(ctx, column)
 	require.NoError(t, err)
@@ -354,9 +354,9 @@ func TestColumnRepository_Context(t *testing.T) {
 	board := createTestBoard(db, user.ID)
 
 	testColumn := &models.Column{
-		BoardID: board.ID,
-		Title:   "To Do",
-		Order:   1,
+		BoardID:  board.ID,
+		Title:    "To Do",
+		OrderNum: 1,
 	}
 
 	err := repo.Create(ctx, testColumn)

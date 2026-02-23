@@ -175,7 +175,7 @@ func TestLabelTaskRelationship(t *testing.T) {
 		ID:        columnID,
 		BoardID:   boardID,
 		Title:     "To Do",
-		Order:     1,
+		OrderNum:  1,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -400,7 +400,7 @@ func TestTaskLabelDatabase(t *testing.T) {
 		ID:        columnID,
 		BoardID:   boardID,
 		Title:     "To Do",
-		Order:     1,
+		OrderNum:  1,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -476,7 +476,7 @@ func TestTaskLabelCascadeDelete(t *testing.T) {
 	column := Column{
 		ID:        columnID,
 		Title:     "To Do",
-		Order:     1,
+		OrderNum:  1,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}

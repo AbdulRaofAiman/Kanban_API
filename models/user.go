@@ -45,6 +45,11 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 		u.Password = hashedPassword
 	}
 
+	return nil
+}
+
+// AfterCreate is a GORM hook called after creating a user
+func (u *User) AfterCreate(tx *gorm.DB) error {
 	// Log to audit table
 	return u.logAudit(tx, "create", "User created")
 }

@@ -15,7 +15,7 @@ func TestColumnModel(t *testing.T) {
 		ID:        uuid.NewString(),
 		BoardID:   uuid.NewString(),
 		Title:     "To Do",
-		Order:     1,
+		OrderNum:  1,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -32,7 +32,7 @@ func TestColumnModel(t *testing.T) {
 	assert.NotEmpty(t, column.ID, "ID should not be empty")
 	assert.NotEmpty(t, column.BoardID, "BoardID should not be empty")
 	assert.NotEmpty(t, column.Title, "Title should not be empty")
-	assert.GreaterOrEqual(t, column.Order, 0, "Order should be non-negative")
+	assert.GreaterOrEqual(t, column.OrderNum, 0, "Order should be non-negative")
 	assert.False(t, column.CreatedAt.IsZero(), "CreatedAt should be set")
 	assert.False(t, column.UpdatedAt.IsZero(), "UpdatedAt should be set")
 
@@ -80,7 +80,7 @@ func TestColumnDatabase(t *testing.T) {
 		ID:        columnID,
 		BoardID:   boardID,
 		Title:     "To Do",
-		Order:     1,
+		OrderNum:  1,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -94,7 +94,7 @@ func TestColumnDatabase(t *testing.T) {
 	assert.Equal(t, column.ID, retrievedColumn.ID, "Column ID should match")
 	assert.Equal(t, column.Title, retrievedColumn.Title, "Column Title should match")
 	assert.Equal(t, column.BoardID, retrievedColumn.BoardID, "Column BoardID should match")
-	assert.Equal(t, column.Order, retrievedColumn.Order, "Column Order should match")
+	assert.Equal(t, column.OrderNum, retrievedColumn.OrderNum, "Column Order should match")
 }
 
 // TestColumnRelationships verifies Column relationships to Task and Board
@@ -131,7 +131,7 @@ func TestColumnRelationships(t *testing.T) {
 		ID:        columnID,
 		BoardID:   boardID,
 		Title:     "In Progress",
-		Order:     2,
+		OrderNum:  2,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -208,7 +208,7 @@ func TestColumnSoftDelete(t *testing.T) {
 		ID:        uuid.NewString(),
 		BoardID:   boardID,
 		Title:     "To Do",
-		Order:     1,
+		OrderNum:  1,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -253,8 +253,8 @@ func TestColumnGORMTags(t *testing.T) {
 			assert.True(t, field.NotNull, "BoardID should have not null tag")
 		case "Title":
 			assert.True(t, field.NotNull, "Title should have not null tag")
-		case "Order":
-			assert.True(t, field.NotNull, "Order should have not null tag")
+		case "OrderNum":
+			assert.True(t, field.NotNull, "OrderNum should have not null tag")
 		}
 	}
 

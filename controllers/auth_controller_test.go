@@ -17,8 +17,9 @@ import (
 )
 
 type mockAuthService struct {
-	registerFunc func(username, email, password string) (*models.User, error)
-	loginFunc    func(email, password string) (string, error)
+	registerFunc    func(username, email, password string) (*models.User, error)
+	loginFunc       func(email, password string) (string, error)
+	getUserByIDFunc func(userID string) (*models.User, error)
 }
 
 func (m *mockAuthService) Register(ctx context.Context, username, email, password string) (*models.User, error) {
@@ -57,6 +58,21 @@ func (m *mockAuthService) HashPassword(password string) (string, error) {
 
 func (m *mockAuthService) VerifyPassword(hashedPassword, password string) error {
 	return nil
+}
+
+func (m *mockAuthService) GetUserByID(ctx context.Context, userID string) (*models.User, error) {
+	if m.getUserByIDFunc != nil {
+		return m.getUserByIDFunc(userID)
+	}
+	user := &models.User{
+		ID:        userID,
+		Username:  "testuser",
+		Email:     "test@example.com",
+		Password:  "hashed-password",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	return user, nil
 }
 
 func TestNewAuthController(t *testing.T) {

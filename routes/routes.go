@@ -20,6 +20,8 @@ func Setup(app *fiber.App, authService services.AuthService, authController *con
 	auth := app.Group("/api/v1/auth")
 	auth.Post("/register", authController.Register)
 	auth.Post("/login", authController.Login)
+	auth.Get("/me", middleware.AuthMiddleware(authService), authController.Me)
+	auth.Post("/logout", middleware.AuthMiddleware(authService), authController.Logout)
 
 	boards := app.Group("/api/v1/boards")
 	boards.Use(middleware.AuthMiddleware(authService))

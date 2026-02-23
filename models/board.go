@@ -51,6 +51,32 @@ func (b *Board) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+// AfterCreate is a GORM hook called after creating a board
+func (b *Board) AfterCreate(tx *gorm.DB) error {
+	return b.logAudit(tx, "create", "Board created")
+}
+
+// logAudit logs board actions to the audit_log table
+func (b *Board) logAudit(tx *gorm.DB, action, message string) error {
+	type AuditLog struct {
+		ID        string    `gorm:"primaryKey;type:varchar(36)"`
+		UserID    string    `gorm:"not null;type:varchar(36);index"`
+		Action    string    `gorm:"not null;type:varchar(50)"`
+		Message   string    `gorm:"type:text"`
+		CreatedAt time.Time `gorm:"autoCreateTime"`
+	}
+
+	auditLog := AuditLog{
+		ID:        uuid.New().String(),
+		UserID:    b.UserID,
+		Action:    action,
+		Message:   message,
+		CreatedAt: time.Now(),
+	}
+
+	return tx.Table("audit_logs").Create(&auditLog).Error
+}
+
 // TableName specifies the table name for Board model
 func (Board) TableName() string {
 	return "boards"

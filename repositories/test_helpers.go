@@ -3,9 +3,10 @@ package repositories
 import (
 	"testing"
 
+	"kanban-backend/models"
+
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"kanban-backend/models"
 )
 
 func setupRepositoryTestDB(t *testing.T) *gorm.DB {
@@ -56,9 +57,9 @@ func createTestBoard(db *gorm.DB, userID string) *models.Board {
 
 func createTestColumn(db *gorm.DB, boardID string) *models.Column {
 	column := &models.Column{
-		BoardID: boardID,
-		Title:   "Test Column",
-		Order:   1,
+		BoardID:  boardID,
+		Title:    "Test Column",
+		OrderNum: 1,
 	}
 	db.Create(column)
 	return column

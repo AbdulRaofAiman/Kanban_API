@@ -43,9 +43,9 @@ func (s *boardService) Create(ctx context.Context, userID, title, color string) 
 	}
 
 	defaultColumns := []models.Column{
-		{Title: "To Do", Order: 1, BoardID: board.ID},
-		{Title: "In Progress", Order: 2, BoardID: board.ID},
-		{Title: "Done", Order: 3, BoardID: board.ID},
+		{Title: "To Do", OrderNum: 1, BoardID: board.ID},
+		{Title: "In Progress", OrderNum: 2, BoardID: board.ID},
+		{Title: "Done", OrderNum: 3, BoardID: board.ID},
 	}
 
 	for _, col := range defaultColumns {

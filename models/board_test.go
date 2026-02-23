@@ -152,7 +152,7 @@ func TestBoardRelationships(t *testing.T) {
 		ID:        uuid.NewString(),
 		BoardID:   boardID,
 		Title:     "To Do",
-		Order:     1,
+		OrderNum:  1,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -160,7 +160,7 @@ func TestBoardRelationships(t *testing.T) {
 		ID:        uuid.NewString(),
 		BoardID:   boardID,
 		Title:     "In Progress",
-		Order:     2,
+		OrderNum:  2,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
