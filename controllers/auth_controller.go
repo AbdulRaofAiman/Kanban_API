@@ -84,11 +84,6 @@ func (ctrl *AuthController) Register(c *fiber.Ctx) error {
 		return utils.Error(c, "Failed to register user", fiber.StatusInternalServerError)
 	}
 
-	token, err := ctrl.authService.GenerateToken(user.ID, 24*time.Hour)
-	if err != nil {
-		return utils.Error(c, "Failed to generate token", fiber.StatusInternalServerError)
-	}
-
 	return utils.Success(c, AuthResponse{
 		User: UserResponse{
 			ID:        user.ID,
@@ -97,7 +92,6 @@ func (ctrl *AuthController) Register(c *fiber.Ctx) error {
 			CreatedAt: user.CreatedAt,
 			UpdatedAt: user.UpdatedAt,
 		},
-		Token: token,
 	})
 }
 
@@ -127,9 +121,15 @@ func (ctrl *AuthController) Login(c *fiber.Ctx) error {
 		}
 		return utils.Error(c, "Failed to login", fiber.StatusInternalServerError)
 	}
+	user, err := ctrl.authService.GetUserByID(c.Context(), req.Email)
+	if err != nil {
+		return utils.Error(c, "Failed to get user", fiber.StatusInternalServerError)
+	}
 
 	return utils.Success(c, fiber.Map{
 		"token": token,
+		"user":  user.Username,
+		"email": user.Email,
 	})
 }
 
